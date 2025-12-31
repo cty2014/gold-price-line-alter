@@ -3,9 +3,9 @@ from linebot.models import TextSendMessage
 import os
 
 
-# LINE Bot 設定（優先使用環境變數，適合雲端部署）
-CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN", "g+KcmhaZeUrdd+rwZnCNMTDWwJzT7Vwnkkksl0UFcDdiF3dGr41zPZy6YR7OXLqEf167GuCIgEaj0qVtmwrRa5LMSaNVwp2j4vQMKTRAW+qi2nyo+6ECsOhFwhzhzahTLrjnXCxCFVZ3qbp9qpwt3QdB04t89/1O/w1cDnyilFU=")
-USER_ID = os.getenv("USER_ID", "U39ae43e351f819abaef6083d27d3369e")
+# LINE Bot 設定（必須從環境變數讀取，適合雲端部署）
+CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
+USER_ID = os.getenv("USER_ID")
 
 
 def send_line_push(message):
@@ -20,12 +20,14 @@ def send_line_push(message):
     """
     try:
         # 檢查 token 和 user_id 是否設定
-        if CHANNEL_ACCESS_TOKEN == "YOUR_CHANNEL_ACCESS_TOKEN" or not CHANNEL_ACCESS_TOKEN:
-            print("錯誤: CHANNEL_ACCESS_TOKEN 未設定或無效")
+        if not CHANNEL_ACCESS_TOKEN or CHANNEL_ACCESS_TOKEN.strip() == "":
+            print("✗ 錯誤: CHANNEL_ACCESS_TOKEN 環境變數未設定")
+            print("   請在 GitHub Secrets 中設定 CHANNEL_ACCESS_TOKEN")
             return False
         
-        if USER_ID == "YOUR_USER_ID" or not USER_ID:
-            print("錯誤: USER_ID 未設定或無效")
+        if not USER_ID or USER_ID.strip() == "":
+            print("✗ 錯誤: USER_ID 環境變數未設定")
+            print("   請在 GitHub Secrets 中設定 USER_ID")
             return False
         
         # 初始化 LineBotApi

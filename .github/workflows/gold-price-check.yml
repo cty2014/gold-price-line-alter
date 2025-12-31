@@ -28,6 +28,17 @@ jobs:
         CHANNEL_ACCESS_TOKEN: ${{ secrets.CHANNEL_ACCESS_TOKEN }}
         USER_ID: ${{ secrets.USER_ID }}
       run: |
+        echo "開始執行黃金價格檢查..."
+        echo "檢查環境變數設定狀態..."
+        if [ -z "$CHANNEL_ACCESS_TOKEN" ]; then
+          echo "✗ 錯誤: CHANNEL_ACCESS_TOKEN 未設定"
+          exit 1
+        fi
+        if [ -z "$USER_ID" ]; then
+          echo "✗ 錯誤: USER_ID 未設定"
+          exit 1
+        fi
+        echo "✓ 環境變數檢查通過"
         python3 main.py
 
 

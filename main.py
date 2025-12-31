@@ -54,20 +54,47 @@ def main():
         channel_token = os.getenv("CHANNEL_ACCESS_TOKEN")
         user_id = os.getenv("USER_ID")
         
-        if not channel_token:
-            print("⚠️  警告: CHANNEL_ACCESS_TOKEN 環境變數未設定")
+        if not channel_token or channel_token.strip() == "":
+            print("✗ 錯誤: CHANNEL_ACCESS_TOKEN 環境變數未設定")
             print("   請在 GitHub Secrets 中設定 CHANNEL_ACCESS_TOKEN")
+            print("   程式無法繼續執行，請檢查 GitHub Actions Secrets 設定")
+            return
         
-        if not user_id:
-            print("⚠️  警告: USER_ID 環境變數未設定")
+        if not user_id or user_id.strip() == "":
+            print("✗ 錯誤: USER_ID 環境變數未設定")
             print("   請在 GitHub Secrets 中設定 USER_ID")
+            print("   程式無法繼續執行，請檢查 GitHub Actions Secrets 設定")
+            return
+        
+        print(f"✓ 環境變數檢查通過")
+        print(f"  CHANNEL_ACCESS_TOKEN: {'已設定' if channel_token else '未設定'}")
+        print(f"  USER_ID: {'已設定' if user_id else '未設定'}")
         
         # 獲取黃金價格（包含當前價格和開盤價）
         price_data = get_gold_price()
         
         if price_data is None:
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 無法獲取黃金價格")
+            error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"[{error_time}] 無法獲取黃金價格")
             print("   這可能是 API 連接問題，請檢查網路連線")
+            
+            # 即使無法獲取價格，也發送錯誤通知
+            error_message = f"⚠️ 黃金價格獲取失敗\n\n"
+            error_message += f"報告時間: {error_time}\n"
+            error_message += f"錯誤原因: 無法連接到黃金價格 API\n"
+            error_message += f"請檢查:\n"
+            error_message += f"1. 網路連線是否正常\n"
+            error_message += f"2. API 服務是否可用\n"
+            error_message += f"3. GitHub Actions 執行環境是否正常"
+            
+            print(f"\n準備發送錯誤通知到 LINE...")
+            success = send_line_push(error_message)
+            
+            if success:
+                print("✓ 錯誤通知已成功發送")
+            else:
+                print("✗ 錯誤通知發送失敗")
+            
             return
         
         current_price = price_data['current_price']
@@ -91,8 +118,8 @@ def main():
         message = format_notification_message(current_price, day_high, day_low)
         
         # 發送 LINE 通知
-        print(f"準備發送訊息到 LINE...")
-        print(f"訊息內容預覽:\n{message[:100]}...")
+        print(f"\n準備發送訊息到 LINE...")
+        print(f"訊息內容預覽:\n{message}\n")
         success = send_line_push(message)
         
         if success:
@@ -104,6 +131,8 @@ def main():
             print("   2. USER_ID 未設定或無效")
             print("   3. 用戶未加入 Bot 為好友")
             print("   4. LINE Bot API 連線問題")
+            print("   5. Token 已過期或被撤銷")
+            raise Exception("LINE 通知發送失敗，請檢查設定")
         
         # 如果漲跌幅超過閾值，額外記錄
         if abs_change_percent >= THRESHOLD_PERCENT:
