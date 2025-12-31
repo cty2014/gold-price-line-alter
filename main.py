@@ -1,4 +1,6 @@
 from datetime import datetime
+import os
+import json
 from get_gold_price import get_gold_price
 from line_notify import send_line_push
 
@@ -40,17 +42,16 @@ def format_notification_message(current_price, day_high, day_low):
 
 def main():
     """
-    主程式：執行一次價格檢查，如果漲跌幅超過 1% 則發送 LINE 通知
+    主程式：每日發送一次報告，或當價格波動超過5%時觸發通知
     """
-    THRESHOLD_PERCENT = 1.0  # 1% 的變動閾值
+    VOLATILITY_THRESHOLD = 5.0  # 5% 的波動閾值（當天最高價與最低價的波動）
     
     print("黃金價格監控系統啟動...")
-    print(f"變動閾值: {THRESHOLD_PERCENT}%")
+    print(f"波動觸發閾值: {VOLATILITY_THRESHOLD}%")
     print("-" * 50)
     
     try:
         # 檢查環境變數是否設定（GitHub Actions）
-        import os
         channel_token = os.getenv("CHANNEL_ACCESS_TOKEN")
         user_id = os.getenv("USER_ID")
         
@@ -102,43 +103,96 @@ def main():
         day_high = price_data['day_high']
         day_low = price_data['day_low']
         
+        # 計算當天的價格波動幅度（最高價與最低價的波動）
+        if day_high > 0:
+            volatility_percent = ((day_high - day_low) / day_high) * 100
+        else:
+            volatility_percent = 0.0
+        
         # 計算相對於開盤價的漲跌幅
         change_percent = ((current_price - open_price) / open_price) * 100
-        abs_change_percent = abs(change_percent)
         
         # 顯示當前狀態
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 當前價格: ${current_price:.2f} | "
+        now = datetime.now()
+        current_date = now.strftime('%Y-%m-%d')
+        current_time = now.strftime('%Y-%m-%d %H:%M:%S')
+        
+        print(f"[{current_time}] 當前價格: ${current_price:.2f} | "
               f"開盤價格: ${open_price:.2f} | 漲跌幅: {change_percent:+.2f}%")
-        print(f"當天最高: ${day_high:.2f} | 當天最低: ${day_low:.2f}")
+        print(f"當天最高: ${day_high:.2f} | 當天最低: ${day_low:.2f} | 波動幅度: {volatility_percent:.2f}%")
         
-        # 發送每日黃金價格報告（每次執行都發送）
-        print(f"📊 準備發送每日黃金價格報告...")
+        # 檢查是否已經發送過今天的報告
+        report_file = "last_report_time.json"
+        should_send_daily = False
+        should_send_alert = False
         
-        # 格式化通知訊息（使用新的報告格式）
-        message = format_notification_message(current_price, day_high, day_low)
+        try:
+            if os.path.exists(report_file):
+                with open(report_file, 'r') as f:
+                    last_report = json.load(f)
+                    last_report_date = last_report.get('date', '')
+                    if last_report_date != current_date:
+                        should_send_daily = True
+            else:
+                # 如果檔案不存在，發送每日報告
+                should_send_daily = True
+        except Exception as e:
+            print(f"讀取報告記錄時發生錯誤: {e}")
+            should_send_daily = True
         
-        # 發送 LINE 通知
-        print(f"\n準備發送訊息到 LINE...")
-        print(f"訊息內容預覽:\n{message}\n")
-        success = send_line_push(message)
+        # 檢查波動是否超過5%
+        if volatility_percent >= VOLATILITY_THRESHOLD:
+            should_send_alert = True
+            print(f"⚠️  價格波動超過 {VOLATILITY_THRESHOLD}% ({volatility_percent:.2f}%)，觸發通知")
         
-        if success:
-            print("✓ LINE 通知已成功發送")
+        # 決定是否發送通知
+        should_send = should_send_daily or should_send_alert
+        
+        if should_send:
+            if should_send_daily and should_send_alert:
+                print(f"📊 準備發送每日黃金價格報告（價格波動超過 {VOLATILITY_THRESHOLD}%）...")
+            elif should_send_daily:
+                print(f"📊 準備發送每日黃金價格報告...")
+            else:
+                print(f"⚠️  價格波動超過 {VOLATILITY_THRESHOLD}%，發送警報通知...")
+            
+            # 格式化通知訊息
+            if should_send_alert:
+                message = format_notification_message(current_price, day_high, day_low)
+                message = f"⚠️ 價格波動警報\n\n" + message
+            else:
+                message = format_notification_message(current_price, day_high, day_low)
+            
+            # 發送 LINE 通知
+            print(f"\n準備發送訊息到 LINE...")
+            print(f"訊息內容預覽:\n{message}\n")
+            success = send_line_push(message)
+            
+            if success:
+                print("✓ LINE 通知已成功發送")
+                # 記錄發送時間
+                try:
+                    with open(report_file, 'w') as f:
+                        json.dump({
+                            'date': current_date,
+                            'time': current_time,
+                            'price': current_price,
+                            'volatility': volatility_percent
+                        }, f)
+                except Exception as e:
+                    print(f"記錄報告時間時發生錯誤: {e}")
+            else:
+                print("✗ LINE 通知發送失敗")
+                print("   可能的原因:")
+                print("   1. CHANNEL_ACCESS_TOKEN 未設定或無效")
+                print("   2. USER_ID 未設定或無效")
+                print("   3. 用戶未加入 Bot 為好友")
+                print("   4. LINE Bot API 連線問題")
+                print("   5. Token 已過期或被撤銷")
+                raise Exception("LINE 通知發送失敗，請檢查設定")
         else:
-            print("✗ LINE 通知發送失敗")
-            print("   可能的原因:")
-            print("   1. CHANNEL_ACCESS_TOKEN 未設定或無效")
-            print("   2. USER_ID 未設定或無效")
-            print("   3. 用戶未加入 Bot 為好友")
-            print("   4. LINE Bot API 連線問題")
-            print("   5. Token 已過期或被撤銷")
-            raise Exception("LINE 通知發送失敗，請檢查設定")
-        
-        # 如果漲跌幅超過閾值，額外記錄
-        if abs_change_percent >= THRESHOLD_PERCENT:
-            print(f"⚠️  價格變動超過 {THRESHOLD_PERCENT}%")
-        else:
-            print(f"價格變動在正常範圍內（< {THRESHOLD_PERCENT}%）")
+            print(f"✓ 今日已發送過報告，且價格波動在正常範圍內（{volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%）")
+            print("   不發送通知")
         
         print("-" * 50)
         print("程式執行完成")
