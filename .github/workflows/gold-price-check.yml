@@ -27,6 +27,7 @@ jobs:
       env:
         CHANNEL_ACCESS_TOKEN: ${{ secrets.CHANNEL_ACCESS_TOKEN }}
         USER_ID: ${{ secrets.USER_ID }}
+        ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
       run: |
         echo "開始執行黃金價格檢查..."
         echo "檢查環境變數設定狀態..."
@@ -37,6 +38,11 @@ jobs:
         if [ -z "$USER_ID" ]; then
           echo "✗ 錯誤: USER_ID 未設定"
           exit 1
+        fi
+        if [ -z "$ALPHA_VANTAGE_API_KEY" ]; then
+          echo "⚠️  警告: ALPHA_VANTAGE_API_KEY 未設定，將使用備用 API"
+        else
+          echo "✓ ALPHA_VANTAGE_API_KEY 已設定"
         fi
         echo "✓ 環境變數檢查通過"
         python3 main.py
