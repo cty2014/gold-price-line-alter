@@ -70,20 +70,23 @@ def main():
               f"開盤價格: ${open_price:.2f} | 漲跌幅: {change_percent:+.2f}%")
         print(f"當天最高: ${day_high:.2f} | 當天最低: ${day_low:.2f}")
         
-        # 如果漲跌幅超過閾值，發送 LINE 通知
+        # 發送每日黃金價格報告（每次執行都發送）
+        print(f"📊 準備發送每日黃金價格報告...")
+        
+        # 格式化通知訊息（使用新的報告格式）
+        message = format_notification_message(current_price, day_high, day_low)
+        
+        # 發送 LINE 通知
+        success = send_line_push(message)
+        
+        if success:
+            print("✓ LINE 通知已成功發送")
+        else:
+            print("✗ LINE 通知發送失敗")
+        
+        # 如果漲跌幅超過閾值，額外記錄
         if abs_change_percent >= THRESHOLD_PERCENT:
-            print(f"⚠️  價格變動超過 {THRESHOLD_PERCENT}%，發送 LINE 通知...")
-            
-            # 格式化通知訊息（使用新的報告格式）
-            message = format_notification_message(current_price, day_high, day_low)
-            
-            # 發送 LINE 通知
-            success = send_line_push(message)
-            
-            if success:
-                print("✓ LINE 通知已成功發送")
-            else:
-                print("✗ LINE 通知發送失敗")
+            print(f"⚠️  價格變動超過 {THRESHOLD_PERCENT}%")
         else:
             print(f"價格變動在正常範圍內（< {THRESHOLD_PERCENT}%）")
         
