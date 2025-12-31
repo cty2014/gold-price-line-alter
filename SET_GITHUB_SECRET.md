@@ -1,9 +1,9 @@
 # 設定 GitHub Secrets 指南
 
-## Alpha Vantage API Key
+## GoldAPI.io API Key
 
-**Secret 名稱**: `ALPHA_VANTAGE_API_KEY`  
-**Secret 值**: `R241TYN8MNBILQAF`
+**Secret 名稱**: `GOLDAPI_KEY`  
+**Secret 值**: `goldapi-g2zyesmjucbyr3-io`
 
 ## 手動設定步驟
 
@@ -15,8 +15,8 @@
 3. 點擊 **New repository secret**
 
 4. 填寫：
-   - **Name**: `ALPHA_VANTAGE_API_KEY`
-   - **Secret**: `R241TYN8MNBILQAF`
+   - **Name**: `GOLDAPI_KEY`
+   - **Secret**: `goldapi-g2zyesmjucbyr3-io`
 
 5. 點擊 **Add secret**
 
