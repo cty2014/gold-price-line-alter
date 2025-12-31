@@ -1,0 +1,32 @@
+name: 黃金價格監控
+
+on:
+  schedule:
+    # 每 10 分鐘執行一次
+    - cron: '*/10 * * * *'
+  workflow_dispatch:  # 允許手動觸發
+
+jobs:
+  check-gold-price:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 檢出程式碼
+      uses: actions/checkout@v3
+    
+    - name: 設定 Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: 安裝依賴
+      run: |
+        pip install -r requirements.txt
+    
+    - name: 執行價格檢查
+      env:
+        CHANNEL_ACCESS_TOKEN: ${{ secrets.CHANNEL_ACCESS_TOKEN }}
+        USER_ID: ${{ secrets.USER_ID }}
+      run: |
+        python3 main.py
+
