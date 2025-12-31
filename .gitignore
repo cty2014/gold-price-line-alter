@@ -1,0 +1,11 @@
+*.pyc
+__pycache__/
+*.log
+*.json
+!requirements.txt
+.env
+venv/
+.DS_Store
+main_output.log
+main.log
+
