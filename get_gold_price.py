@@ -47,9 +47,21 @@ def get_gold_price():
                 print("無法從 API 獲取開盤價，使用當前價格作為開盤價")
                 open_price = current_price
             
+            # 獲取當天最高價和最低價
+            day_high = quote_data.get('high', None) or quote_data.get('dayHigh', None)
+            day_low = quote_data.get('low', None) or quote_data.get('dayLow', None)
+            
+            # 如果沒有最高最低價，使用當前價格作為近似值
+            if day_high is None:
+                day_high = current_price
+            if day_low is None:
+                day_low = current_price
+            
             return {
                 'current_price': float(current_price),
-                'open_price': float(open_price)
+                'open_price': float(open_price),
+                'day_high': float(day_high),
+                'day_low': float(day_low)
             }
         else:
             print("API 回應格式錯誤")
