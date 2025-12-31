@@ -49,11 +49,25 @@ def main():
     print("-" * 50)
     
     try:
+        # 檢查環境變數是否設定（GitHub Actions）
+        import os
+        channel_token = os.getenv("CHANNEL_ACCESS_TOKEN")
+        user_id = os.getenv("USER_ID")
+        
+        if not channel_token:
+            print("⚠️  警告: CHANNEL_ACCESS_TOKEN 環境變數未設定")
+            print("   請在 GitHub Secrets 中設定 CHANNEL_ACCESS_TOKEN")
+        
+        if not user_id:
+            print("⚠️  警告: USER_ID 環境變數未設定")
+            print("   請在 GitHub Secrets 中設定 USER_ID")
+        
         # 獲取黃金價格（包含當前價格和開盤價）
         price_data = get_gold_price()
         
         if price_data is None:
             print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 無法獲取黃金價格")
+            print("   這可能是 API 連接問題，請檢查網路連線")
             return
         
         current_price = price_data['current_price']
@@ -77,12 +91,19 @@ def main():
         message = format_notification_message(current_price, day_high, day_low)
         
         # 發送 LINE 通知
+        print(f"準備發送訊息到 LINE...")
+        print(f"訊息內容預覽:\n{message[:100]}...")
         success = send_line_push(message)
         
         if success:
             print("✓ LINE 通知已成功發送")
         else:
             print("✗ LINE 通知發送失敗")
+            print("   可能的原因:")
+            print("   1. CHANNEL_ACCESS_TOKEN 未設定或無效")
+            print("   2. USER_ID 未設定或無效")
+            print("   3. 用戶未加入 Bot 為好友")
+            print("   4. LINE Bot API 連線問題")
         
         # 如果漲跌幅超過閾值，額外記錄
         if abs_change_percent >= THRESHOLD_PERCENT:
