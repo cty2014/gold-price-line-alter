@@ -1,5 +1,7 @@
 # 黃金價格監控系統
 
+[![黃金價格監控](https://github.com/cty2014/gold-price-line-alter/actions/workflows/gold-price-check.yml/badge.svg)](https://github.com/cty2014/gold-price-line-alter/actions/workflows/gold-price-check.yml)
+
 自動監控黃金現貨價格，並透過 LINE Bot 發送通知。
 
 ## 功能
