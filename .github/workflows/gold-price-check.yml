@@ -30,22 +30,50 @@ jobs:
         USER_ID: ${{ secrets.USER_ID }}
         GOLDAPI_KEY: ${{ secrets.GOLDAPI_KEY }}
       run: |
+        echo "=========================================="
         echo "開始執行黃金價格檢查..."
+        echo "=========================================="
+        echo ""
         echo "檢查環境變數設定狀態..."
+        echo ""
+        
+        # 檢查 CHANNEL_ACCESS_TOKEN
         if [ -z "$CHANNEL_ACCESS_TOKEN" ]; then
           echo "✗ 錯誤: CHANNEL_ACCESS_TOKEN 未設定"
+          echo "   請在 GitHub Secrets 中設定 CHANNEL_ACCESS_TOKEN"
           exit 1
+        else
+          echo "✓ CHANNEL_ACCESS_TOKEN: 已設定 (長度: ${#CHANNEL_ACCESS_TOKEN} 字元)"
         fi
+        
+        # 檢查 USER_ID
         if [ -z "$USER_ID" ]; then
           echo "✗ 錯誤: USER_ID 未設定"
+          echo "   請在 GitHub Secrets 中設定 USER_ID"
           exit 1
+        else
+          echo "✓ USER_ID: 已設定 (值: $USER_ID)"
         fi
+        
+        # 檢查 GOLDAPI_KEY（選填）
         if [ -z "$GOLDAPI_KEY" ]; then
           echo "⚠️  警告: GOLDAPI_KEY 未設定，將使用備用 API"
         else
-          echo "✓ GOLDAPI_KEY 已設定"
+          echo "✓ GOLDAPI_KEY: 已設定 (長度: ${#GOLDAPI_KEY} 字元)"
         fi
-        echo "✓ 環境變數檢查通過"
+        
+        echo ""
+        echo "=========================================="
+        echo "✓ 環境變數檢查通過，開始執行主程式"
+        echo "=========================================="
+        echo ""
+        
+        # 執行主程式
         python3 main.py
+        
+        echo ""
+        echo "=========================================="
+        echo "程式執行完成"
+        echo "=========================================="
 
 
