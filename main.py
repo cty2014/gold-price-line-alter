@@ -1,9 +1,20 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import os
 import json
 from get_gold_price import get_gold_price
 from get_bot_gold_price import get_bot_gold_price
 from line_notify import send_line_push
+
+
+def get_taiwan_time():
+    """
+    獲取台灣時間（UTC+8）
+    
+    Returns:
+        datetime: 台灣時間的 datetime 對象
+    """
+    taiwan_tz = timezone(timedelta(hours=8))
+    return datetime.now(taiwan_tz)
 
 
 def format_notification_message(current_price, day_high, day_low, bot_price=None):
@@ -19,9 +30,10 @@ def format_notification_message(current_price, day_high, day_low, bot_price=None
     Returns:
         str: 格式化後的訊息
     """
-    now = datetime.now()
-    current_date = now.strftime('%Y-%m-%d')
-    current_time = now.strftime('%Y-%m-%d %H:%M:%S')
+    # 使用台灣時間（UTC+8）
+    taiwan_now = get_taiwan_time()
+    current_date = taiwan_now.strftime('%Y-%m-%d')
+    current_time = taiwan_now.strftime('%Y-%m-%d %H:%M:%S')
     
     # 計算波動幅度
     if day_high > 0:
@@ -89,8 +101,9 @@ def main():
         price_data = get_gold_price()
         
         if price_data is None:
-            error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            taiwan_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            taiwan_time_obj = get_taiwan_time()
+            error_time = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            taiwan_time = taiwan_time_obj.strftime('%Y-%m-%d %H:%M:%S')
             print(f"[{error_time}] 無法獲取黃金價格")
             print("   這可能是 API 連接問題，請檢查網路連線")
             
@@ -174,10 +187,12 @@ def main():
         # 計算相對於開盤價的漲跌幅
         change_percent = ((current_price - open_price) / open_price) * 100
         
-        # 顯示當前狀態
-        now = datetime.now()
-        current_date = now.strftime('%Y-%m-%d')
-        current_time = now.strftime('%Y-%m-%d %H:%M:%S')
+        # 顯示當前狀態（使用台灣時間）
+        taiwan_time = get_taiwan_time()
+        current_date = taiwan_time.strftime('%Y-%m-%d')
+        current_time = taiwan_time.strftime('%Y-%m-%d %H:%M:%S')
+        taiwan_hour = taiwan_time.hour
+        taiwan_minute = taiwan_time.minute
         
         print(f"[{current_time}] 當前價格: ${current_price:.2f} | "
               f"開盤價格: ${open_price:.2f} | 漲跌幅: {change_percent:+.2f}%")
@@ -185,14 +200,11 @@ def main():
         
         # 判斷是否應該發送報告
         utc_now = datetime.utcnow()
-        taiwan_time = datetime.now()
-        taiwan_hour = taiwan_time.hour
-        taiwan_minute = taiwan_time.minute
         
         # 輸出當前時間信息（用於調試）
         print(f"\n⏰ 當前時間資訊:")
         print(f"   UTC 時間: {utc_now.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"   台灣時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"   台灣時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')} (UTC+8)")
         print(f"   台灣時間: {taiwan_hour:02d}:{taiwan_minute:02d}")
         
         # 檢查是否為手動觸發（透過環境變數判斷）
@@ -311,7 +323,7 @@ def main():
             print(f"\n✓ 價格變化在正常範圍內")
             if price_change_percent:
                 print(f"   價格變化: {price_change_percent:.2f}% < {PRICE_CHANGE_THRESHOLD}%")
-            print(f"   當前時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"   當前時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')} (台灣時間)")
             print(f"   非日報表發送時間，不發送通知")
             
             # 即使不發送通知，也保存當前價格
@@ -331,7 +343,8 @@ def main():
         print("程式執行完成")
     
     except Exception as e:
-        error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        taiwan_time_obj = get_taiwan_time()
+        error_time = taiwan_time_obj.strftime('%Y-%m-%d %H:%M:%S')
         print(f"\n{'='*60}")
         print(f"[{error_time}] 發生錯誤: {e}")
         print(f"{'='*60}")
