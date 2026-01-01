@@ -202,33 +202,41 @@ def main():
             # 發送 LINE 通知
             print(f"\n準備發送訊息到 LINE...")
             print(f"訊息內容預覽:\n{message}\n")
-            success = send_line_push(message)
             
-            if success:
-                print("✓ LINE 通知已成功發送")
-                # 記錄本次報告的發送時間（用於追蹤）
-                if should_send_daily:
-                    try:
-                        last_report_file = "last_report_time.json"
-                        report_data = {
-                            'date': utc_now.strftime('%Y-%m-%d'),
-                            'time': utc_now.strftime('%Y-%m-%d %H:%M:%S'),
-                            'taiwan_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        }
-                        with open(last_report_file, 'w', encoding='utf-8') as f:
-                            json.dump(report_data, f, ensure_ascii=False, indent=2)
-                        print(f"✓ 已記錄報告發送時間")
-                    except Exception as e:
-                        print(f"⚠️  記錄報告時間時發生錯誤: {e}")
-            else:
-                print("✗ LINE 通知發送失敗")
-                print("   可能的原因:")
-                print("   1. CHANNEL_ACCESS_TOKEN 未設定或無效")
-                print("   2. USER_ID 未設定或無效")
-                print("   3. 用戶未加入 Bot 為好友")
-                print("   4. LINE Bot API 連線問題")
-                print("   5. Token 已過期或被撤銷")
-                raise Exception("LINE 通知發送失敗，請檢查設定")
+            try:
+                success = send_line_push(message)
+                
+                if success:
+                    print("✓ LINE 通知已成功發送")
+                    # 記錄本次報告的發送時間（用於追蹤）
+                    if should_send_daily:
+                        try:
+                            last_report_file = "last_report_time.json"
+                            report_data = {
+                                'date': utc_now.strftime('%Y-%m-%d'),
+                                'time': utc_now.strftime('%Y-%m-%d %H:%M:%S'),
+                                'taiwan_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            }
+                            with open(last_report_file, 'w', encoding='utf-8') as f:
+                                json.dump(report_data, f, ensure_ascii=False, indent=2)
+                            print(f"✓ 已記錄報告發送時間")
+                        except Exception as e:
+                            print(f"⚠️  記錄報告時間時發生錯誤: {e}")
+                else:
+                    print("✗ LINE 通知發送失敗")
+                    print("   可能的原因:")
+                    print("   1. CHANNEL_ACCESS_TOKEN 未設定或無效")
+                    print("   2. USER_ID 未設定或無效")
+                    print("   3. 用戶未加入 Bot 為好友")
+                    print("   4. LINE Bot API 連線問題")
+                    print("   5. Token 已過期或被撤銷")
+                    # 不拋出異常，讓程式繼續執行，但記錄錯誤
+                    print("   警告: 通知發送失敗，但程式繼續執行")
+            except Exception as e:
+                print(f"✗ 發送 LINE 通知時發生異常: {e}")
+                import traceback
+                traceback.print_exc()
+                print("   警告: 通知發送失敗，但程式繼續執行")
         else:
             taiwan_time = datetime.now()
             print(f"✓ 價格波動在正常範圍內（{volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%），僅發送日報表")
@@ -241,7 +249,23 @@ def main():
         print("程式執行完成")
     
     except Exception as e:
-        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 發生錯誤: {e}")
+        error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(f"\n{'='*60}")
+        print(f"[{error_time}] 發生錯誤: {e}")
+        print(f"{'='*60}")
+        import traceback
+        traceback.print_exc()
+        
+        # 嘗試發送錯誤通知
+        try:
+            error_message = f"❌ 系統錯誤\n\n"
+            error_message += f"錯誤時間: {error_time}\n"
+            error_message += f"錯誤訊息: {str(e)}\n\n"
+            error_message += f"請檢查 GitHub Actions 執行日誌以獲取詳細資訊。"
+            send_line_push(error_message)
+        except:
+            print("無法發送錯誤通知")
+        
         raise
 
 
