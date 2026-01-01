@@ -108,75 +108,98 @@ def get_gold_price():
 
 def get_gold_price_fallback():
     """
-    備用 API：使用鉅亨網 API 獲取黃金現貨價格
-    當 Alpha Vantage API 無法使用時的回退方案
+    備用 API：嘗試多個免費 API 獲取黃金現貨價格
+    當主要 API 無法使用時的回退方案
     
     Returns:
         dict: 包含 current_price (當前價格) 和 open_price (開盤價) 的字典
               如果獲取失敗則返回 None
     """
+    # 嘗試多個備用 API
+    fallback_apis = [
+        ("MetalPrice API", "https://api.metals.live/v1/spot/gold"),
+        ("ExchangeRate-API", "https://api.exchangerate-api.com/v4/latest/XAU"),
+    ]
+    
+    for api_name, api_url in fallback_apis:
+        try:
+            print(f"嘗試使用備用 API ({api_name})...")
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            response = requests.get(api_url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # MetalPrice API 格式
+                if 'price' in data or 'rate' in data:
+                    current_price = float(data.get('price') or data.get('rate', 0))
+                    if current_price > 0:
+                        open_price = data.get('open', current_price) or current_price
+                        day_high = data.get('high', current_price) or current_price
+                        day_low = data.get('low', current_price) or current_price
+                        
+                        print(f"✓ 使用 {api_name} 獲取數據成功")
+                        return {
+                            'current_price': float(current_price),
+                            'open_price': float(open_price),
+                            'day_high': float(day_high),
+                            'day_low': float(day_low)
+                        }
+                
+                # ExchangeRate-API 格式
+                if 'rates' in data:
+                    usd_rate = data['rates'].get('USD', None)
+                    if usd_rate:
+                        # XAU 對 USD 的匯率，需要轉換
+                        current_price = float(usd_rate)
+                        if current_price > 0:
+                            print(f"✓ 使用 {api_name} 獲取數據成功")
+                            return {
+                                'current_price': float(current_price),
+                                'open_price': float(current_price),
+                                'day_high': float(current_price),
+                                'day_low': float(current_price)
+                            }
+        except Exception as e:
+            print(f"  {api_name} 失敗: {e}")
+            continue
+    
+    # 最後嘗試使用 Yahoo Finance API（通過公開的代理）
     try:
-        print("使用備用 API (鉅亨網) 獲取黃金價格...")
-        # 鉅亨網 API URL
-        api_url = "https://ws.cnyes.com/ws/api/v1/quote/quotes/XAUUSD"
-        
-        # 發送請求
+        print("嘗試使用 Yahoo Finance API...")
+        # 使用公開的 Yahoo Finance API 代理
+        api_url = "https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X"
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         response = requests.get(api_url, headers=headers, timeout=10)
         
-        if response.status_code != 200:
-            print(f"備用 API 請求失敗，狀態碼: {response.status_code}")
-            return None
-        
-        data = response.json()
-        
-        # 解析 API 回應
-        if 'data' in data and len(data['data']) > 0:
-            quote_data = data['data'][0]
-            
-            # 獲取當前價格（最新價）
-            current_price = quote_data.get('close', None) or quote_data.get('last', None)
-            
-            # 獲取開盤價
-            open_price = quote_data.get('open', None)
-            
-            # 如果沒有開盤價，嘗試使用昨日收盤價
-            if open_price is None:
-                open_price = quote_data.get('previousClose', None) or quote_data.get('yesterdayClose', None)
-            
-            if current_price is None:
-                print("無法從備用 API 獲取當前價格")
-                return None
-            
-            if open_price is None:
-                print("無法從備用 API 獲取開盤價，使用當前價格作為開盤價")
-                open_price = current_price
-            
-            # 獲取當天最高價和最低價
-            day_high = quote_data.get('high', None) or quote_data.get('dayHigh', None)
-            day_low = quote_data.get('low', None) or quote_data.get('dayLow', None)
-            
-            # 如果沒有最高最低價，使用當前價格作為近似值
-            if day_high is None:
-                day_high = current_price
-            if day_low is None:
-                day_low = current_price
-            
-            return {
-                'current_price': float(current_price),
-                'open_price': float(open_price),
-                'day_high': float(day_high),
-                'day_low': float(day_low)
-            }
-        else:
-            print("備用 API 回應格式錯誤")
-            return None
-    
+        if response.status_code == 200:
+            data = response.json()
+            if 'chart' in data and 'result' in data['chart'] and len(data['chart']['result']) > 0:
+                result = data['chart']['result'][0]
+                meta = result.get('meta', {})
+                current_price = meta.get('regularMarketPrice', None)
+                
+                if current_price:
+                    open_price = meta.get('previousClose', current_price) or current_price
+                    day_high = meta.get('regularMarketDayHigh', current_price) or current_price
+                    day_low = meta.get('regularMarketDayLow', current_price) or current_price
+                    
+                    print(f"✓ 使用 Yahoo Finance API 獲取數據成功")
+                    return {
+                        'current_price': float(current_price),
+                        'open_price': float(open_price),
+                        'day_high': float(day_high),
+                        'day_low': float(day_low)
+                    }
     except Exception as e:
-        print(f"備用 API 獲取失敗: {e}")
-        return None
+        print(f"  Yahoo Finance API 失敗: {e}")
+    
+    print("✗ 所有備用 API 都無法獲取黃金價格")
+    return None
 
 
 if __name__ == "__main__":

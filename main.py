@@ -76,26 +76,40 @@ def main():
         
         if price_data is None:
             error_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            taiwan_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             print(f"[{error_time}] 無法獲取黃金價格")
             print("   這可能是 API 連接問題，請檢查網路連線")
             
-            # 即使無法獲取價格，也發送錯誤通知
+            # 即使無法獲取價格，也發送錯誤通知（強制發送）
             error_message = f"⚠️ 黃金價格獲取失敗\n\n"
-            error_message += f"報告時間: {error_time}\n"
-            error_message += f"錯誤原因: 無法連接到黃金價格 API\n"
+            error_message += f"報告時間: {taiwan_time}\n"
+            error_message += f"UTC 時間: {error_time}\n"
+            error_message += f"錯誤原因: 無法連接到黃金價格 API\n\n"
+            error_message += f"已嘗試的 API:\n"
+            error_message += f"1. GoldAPI.io (需要 API Key)\n"
+            error_message += f"2. 多個備用 API\n\n"
             error_message += f"請檢查:\n"
             error_message += f"1. 網路連線是否正常\n"
             error_message += f"2. API 服務是否可用\n"
-            error_message += f"3. GitHub Actions 執行環境是否正常"
+            error_message += f"3. GitHub Actions 執行環境是否正常\n"
+            error_message += f"4. 是否設定了 GOLDAPI_KEY"
             
             print(f"\n準備發送錯誤通知到 LINE...")
+            print(f"錯誤訊息內容:\n{error_message}\n")
             success = send_line_push(error_message)
             
             if success:
                 print("✓ 錯誤通知已成功發送")
             else:
                 print("✗ 錯誤通知發送失敗")
+                print("   可能的原因:")
+                print("   1. CHANNEL_ACCESS_TOKEN 未設定或無效")
+                print("   2. USER_ID 未設定或無效")
+                print("   3. LINE Bot API 連線問題")
             
+            # 即使發送失敗也繼續執行，不要 return，讓後續邏輯知道發生了錯誤
+            # 但由於 price_data 是 None，後續邏輯會因為 KeyError 而失敗
+            # 所以我們應該 return，但確保錯誤通知已發送
             return
         
         current_price = price_data['current_price']
