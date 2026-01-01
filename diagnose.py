@@ -17,7 +17,6 @@ def check_environment():
     
     channel_token = os.getenv("CHANNEL_ACCESS_TOKEN")
     user_id = os.getenv("USER_ID")
-    goldapi_key = os.getenv("GOLDAPI_KEY")
     
     print(f"CHANNEL_ACCESS_TOKEN: {'✓ 已設定' if channel_token and channel_token.strip() else '✗ 未設定'}")
     if channel_token:
@@ -27,8 +26,6 @@ def check_environment():
     print(f"USER_ID: {'✓ 已設定' if user_id and user_id.strip() else '✗ 未設定'}")
     if user_id:
         print(f"  值: {user_id}")
-    
-    print(f"GOLDAPI_KEY: {'✓ 已設定' if goldapi_key and goldapi_key.strip() else '⚠️  未設定（將使用備用 API）'}")
     
     return channel_token and user_id
 
@@ -188,4 +185,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

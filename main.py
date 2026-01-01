@@ -86,13 +86,11 @@ def main():
             error_message += f"UTC 時間: {error_time}\n"
             error_message += f"錯誤原因: 無法連接到黃金價格 API\n\n"
             error_message += f"已嘗試的 API:\n"
-            error_message += f"1. GoldAPI.io (需要 API Key)\n"
-            error_message += f"2. 多個備用 API\n\n"
+            error_message += f"1. 幣安 API (Binance)\n\n"
             error_message += f"請檢查:\n"
             error_message += f"1. 網路連線是否正常\n"
-            error_message += f"2. API 服務是否可用\n"
-            error_message += f"3. GitHub Actions 執行環境是否正常\n"
-            error_message += f"4. 是否設定了 GOLDAPI_KEY"
+            error_message += f"2. 幣安 API 服務是否可用\n"
+            error_message += f"3. GitHub Actions 執行環境是否正常"
             
             print(f"\n準備發送錯誤通知到 LINE...")
             print(f"錯誤訊息內容:\n{error_message}\n")
