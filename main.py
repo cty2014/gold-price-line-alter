@@ -123,7 +123,7 @@ def main():
         
         # 判斷是否應該發送每日報告
         # 在 GitHub Actions 中，我們使用 UTC 時間來判斷
-        # 每日報告時間：UTC 06:30（台灣時間 14:30）
+        # 每日報告時間：UTC 07:00（台灣時間 15:00）
         utc_now = datetime.utcnow()
         current_hour = utc_now.hour
         current_minute = utc_now.minute
@@ -132,10 +132,10 @@ def main():
         # GitHub Actions 手動觸發時會設定 GITHUB_EVENT_NAME
         is_manual_trigger = os.getenv("GITHUB_EVENT_NAME") == "workflow_dispatch"
         
-        # 檢查是否在每日報告時間（UTC 06:30-06:35 之間）
+        # 檢查是否在每日報告時間（UTC 07:00-07:05 之間）
         # 允許 5 分鐘的執行時間窗口
         # 每日報告無條件發送，不受波動影響
-        should_send_daily = (current_hour == 6 and current_minute >= 30 and current_minute < 35) or is_manual_trigger
+        should_send_daily = (current_hour == 7 and current_minute < 5) or is_manual_trigger
         
         # 檢查波動是否超過5%（用於警報通知）
         should_send_alert = False
@@ -151,7 +151,8 @@ def main():
         if is_manual_trigger:
             print(f"📊 手動觸發執行，強制發送報告")
         elif should_send_daily:
-            print(f"📊 當前時間 UTC {utc_now.strftime('%H:%M')}（台灣時間 {datetime.now().strftime('%H:%M')}），在每日報告時間窗口內")
+            taiwan_time = datetime.now()
+            print(f"📊 當前時間 UTC {utc_now.strftime('%H:%M')}（台灣時間 {taiwan_time.strftime('%H:%M')}），在每日報告時間窗口內")
         
         if should_send:
             if should_send_daily and should_send_alert:
@@ -166,7 +167,7 @@ def main():
             
             print(f"   發送條件:")
             if should_send_daily:
-                print(f"   - 每日報告: 是（UTC 06:30-06:35 或手動觸發，無條件發送）")
+                print(f"   - 每日報告: 是（UTC 07:00-07:05 或手動觸發，無條件發送）")
             if should_send_alert:
                 print(f"   - 波動警報: 是（波動 {volatility_percent:.2f}% >= {VOLATILITY_THRESHOLD}%）")
             else:
@@ -196,9 +197,10 @@ def main():
                 print("   5. Token 已過期或被撤銷")
                 raise Exception("LINE 通知發送失敗，請檢查設定")
         else:
-            print(f"✓ 不在每日報告時間（UTC 06:30，台灣時間 14:30），且價格波動在正常範圍內（{volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%）")
+            taiwan_time = datetime.now()
+            print(f"✓ 不在每日報告時間（UTC 07:00，台灣時間 15:00），且價格波動在正常範圍內（{volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%）")
             print(f"   當前 UTC 時間: {utc_now.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"   當前台灣時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"   當前台灣時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"   是否手動觸發: {is_manual_trigger}")
             print("   不發送通知")
         
