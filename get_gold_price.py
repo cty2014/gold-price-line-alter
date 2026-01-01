@@ -13,21 +13,21 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 def get_gold_price():
     """
     獲取黃金現貨價格（XAU/USD）
-    優先使用幣安 API 獲取 PAXG/USDT 價格
-    如果幣安 API 失敗（如地理位置限制），則使用 CoinGecko API
+    優先使用 CoinGecko API 獲取 PAXG/USD 價格
+    如果 CoinGecko API 失敗，則使用幣安 API 作為備用
     PAXG (Paxos Gold) 是與黃金掛鉤的穩定幣，1 PAXG = 1 盎司黃金
     
     Returns:
         dict: 包含 current_price (當前價格) 和 open_price (開盤價) 的字典
               如果獲取失敗則返回 None
     """
-    # 先嘗試幣安 API
-    result = get_gold_price_binance()
+    # 優先使用 CoinGecko API（無地理位置限制）
+    result = get_gold_price_coingecko()
     
-    # 如果幣安 API 失敗（特別是 451 錯誤，表示地理位置限制），使用 CoinGecko API
+    # 如果 CoinGecko API 失敗，使用幣安 API 作為備用
     if result is None:
-        print("幣安 API 失敗，嘗試使用 CoinGecko API 作為備用...")
-        result = get_gold_price_coingecko()
+        print("CoinGecko API 失敗，嘗試使用幣安 API 作為備用...")
+        result = get_gold_price_binance()
     
     return result
 
