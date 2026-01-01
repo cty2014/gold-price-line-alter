@@ -43,18 +43,50 @@ def send_line_push(message):
     
     except Exception as e:
         error_msg = str(e)
+        error_type = type(e).__name__
+        
+        print(f"\n{'='*60}")
+        print(f"✗ LINE 通知發送失敗")
+        print(f"{'='*60}")
+        print(f"錯誤類型: {error_type}")
+        print(f"錯誤訊息: {error_msg}")
+        
+        # 詳細錯誤診斷
         if "401" in error_msg or "Authentication failed" in error_msg or "invalid_token" in error_msg:
-            print(f"✗ LINE 認證失敗: CHANNEL_ACCESS_TOKEN 無效或已過期")
-            print(f"  請檢查 LINE Developers Console 並更新 CHANNEL_ACCESS_TOKEN")
+            print(f"\n診斷: CHANNEL_ACCESS_TOKEN 無效或已過期")
+            print(f"解決方法:")
+            print(f"  1. 前往 LINE Developers Console: https://developers.line.biz/console/")
+            print(f"  2. 選擇您的 Bot")
+            print(f"  3. 前往 'Messaging API' 頁面")
+            print(f"  4. 檢查 'Channel access token'")
+            print(f"  5. 如果過期，點擊 'Issue' 重新生成")
+            print(f"  6. 更新 GitHub Secrets 中的 CHANNEL_ACCESS_TOKEN")
         elif "400" in error_msg and ("'to'" in error_msg or "invalid" in error_msg.lower()):
-            print(f"✗ LINE 發送失敗: USER_ID 無效或用戶未加入 Bot 為好友")
-            print(f"  請確認 USER_ID ({USER_ID}) 正確，且用戶已加入您的 LINE Bot")
-            print(f"  提示: USER_ID 應該是字符串格式，且用戶必須先加入 Bot 為好友")
+            print(f"\n診斷: USER_ID 無效或用戶未加入 Bot 為好友")
+            print(f"當前 USER_ID: {USER_ID}")
+            print(f"解決方法:")
+            print(f"  1. 確認用戶已加入您的 LINE Bot 為好友")
+            print(f"  2. 確認 USER_ID 正確（可在 LINE Developers Console 查看）")
+            print(f"  3. 確認 Bot 的 Channel ID 正確")
+            print(f"  4. 更新 GitHub Secrets 中的 USER_ID")
         elif "404" in error_msg or "Invalid user" in error_msg:
-            print(f"✗ LINE 發送失敗: USER_ID 無效或用戶未加入 Bot 為好友")
-            print(f"  請確認 USER_ID 正確，且用戶已加入您的 LINE Bot")
+            print(f"\n診斷: USER_ID 無效或用戶未加入 Bot 為好友")
+            print(f"當前 USER_ID: {USER_ID}")
+            print(f"解決方法:")
+            print(f"  1. 確認用戶已加入您的 LINE Bot 為好友")
+            print(f"  2. 確認 USER_ID 正確")
+            print(f"  3. 確認 Bot 的 Channel ID 正確")
+        elif "429" in error_msg or "rate limit" in error_msg.lower():
+            print(f"\n診斷: API 請求頻率過高")
+            print(f"解決方法: 請稍後再試")
         else:
-            print(f"✗ 發送 LINE 訊息時發生錯誤: {e}")
+            print(f"\n診斷: 未知錯誤")
+            print(f"請檢查完整的錯誤訊息以獲取更多資訊")
+            import traceback
+            print(f"\n完整錯誤堆疊:")
+            traceback.print_exc()
+        
+        print(f"{'='*60}\n")
         return False
 
 
