@@ -55,13 +55,13 @@ def main():
     """
     主程式：每小時監測一次數據
     - 價格超過5%時寄送通知
-    - 如果沒有超過，每天早上10點和凌晨1:30發送日報表
+    - 如果沒有超過，每天早上10:00-10:05和凌晨01:35-01:40發送日報表
     """
     PRICE_CHANGE_THRESHOLD = 5.0  # 5% 的價格變化閾值
     
     print("黃金價格監控系統啟動...")
     print(f"價格變化觸發閾值: {PRICE_CHANGE_THRESHOLD}%")
-    print("日報表發送時間: 每天早上10:00 和 凌晨01:30 (台灣時間)")
+    print("日報表發送時間: 每天早上10:00-10:05 和 凌晨01:35-01:40 (台灣時間)")
     print("-" * 50)
     
     try:
@@ -201,7 +201,7 @@ def main():
         print(f"   GitHub Event: {github_event}")
         print(f"   是否手動觸發: {is_manual_trigger}")
         
-        # 檢查是否為日報表發送時間（早上10:00 或 凌晨01:30）
+        # 檢查是否為日報表發送時間（早上10:00 或 凌晨01:35）
         # 允許5分鐘的誤差範圍（考慮 GitHub Actions 的延遲）
         is_daily_report_time = False
         
@@ -210,10 +210,10 @@ def main():
             is_daily_report_time = True
             print(f"   ✓ 檢測到日報表發送時間: 早上10:00")
         
-        # 凌晨01:30 (01:30-01:35)
-        if taiwan_hour == 1 and 30 <= taiwan_minute <= 35:
+        # 凌晨01:35 (01:35-01:40)
+        if taiwan_hour == 1 and 35 <= taiwan_minute <= 40:
             is_daily_report_time = True
-            print(f"   ✓ 檢測到日報表發送時間: 凌晨01:30")
+            print(f"   ✓ 檢測到日報表發送時間: 凌晨01:35")
         
         if not is_daily_report_time and not is_manual_trigger:
             print(f"   ✗ 非日報表發送時間")
