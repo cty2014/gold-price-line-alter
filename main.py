@@ -42,7 +42,7 @@ def format_notification_message(current_price, day_high, day_low):
 
 def main():
     """
-    主程式：每日發送一次報告，或當價格波動超過5%時觸發通知
+    主程式：每5分鐘發送一次日報表，或當價格波動超過5%時觸發警報通知
     """
     VOLATILITY_THRESHOLD = 5.0  # 5% 的波動閾值（當天最高價與最低價的波動）
     
@@ -121,21 +121,27 @@ def main():
               f"開盤價格: ${open_price:.2f} | 漲跌幅: {change_percent:+.2f}%")
         print(f"當天最高: ${day_high:.2f} | 當天最低: ${day_low:.2f} | 波動幅度: {volatility_percent:.2f}%")
         
-        # 判斷是否應該發送每日報告
-        # 在 GitHub Actions 中，我們使用 UTC 時間來判斷
-        # 每日報告時間：UTC 07:00（台灣時間 15:00）
+        # 判斷是否應該發送報告
+        # 現在改為每5分鐘發送一次日報表
         utc_now = datetime.utcnow()
-        current_hour = utc_now.hour
-        current_minute = utc_now.minute
+        taiwan_time = datetime.now()
+        
+        # 輸出當前時間信息（用於調試）
+        print(f"⏰ 當前時間資訊:")
+        print(f"   UTC 時間: {utc_now.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"   台灣時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')}")
         
         # 檢查是否為手動觸發（透過環境變數判斷）
         # GitHub Actions 手動觸發時會設定 GITHUB_EVENT_NAME
-        is_manual_trigger = os.getenv("GITHUB_EVENT_NAME") == "workflow_dispatch"
+        github_event = os.getenv("GITHUB_EVENT_NAME", "")
+        is_manual_trigger = github_event == "workflow_dispatch"
+        print(f"   GitHub Event: {github_event}")
+        print(f"   是否手動觸發: {is_manual_trigger}")
         
-        # 檢查是否在每日報告時間（UTC 07:00-07:05 之間）
-        # 允許 5 分鐘的執行時間窗口
-        # 每日報告無條件發送，不受波動影響
-        should_send_daily = (current_hour == 7 and current_minute < 5) or is_manual_trigger
+        # 每5分鐘執行一次，每次都發送日報表（無條件發送）
+        # 移除時間窗口限制和重複發送檢查
+        should_send_daily = True
+        print(f"   📊 每5分鐘發送日報表模式：啟用")
         
         # 檢查波動是否超過5%（用於警報通知）
         should_send_alert = False
@@ -149,10 +155,9 @@ def main():
         should_send = should_send_daily or should_send_alert
         
         if is_manual_trigger:
-            print(f"📊 手動觸發執行，強制發送報告")
+            print(f"📊 手動觸發執行，發送報告")
         elif should_send_daily:
-            taiwan_time = datetime.now()
-            print(f"📊 當前時間 UTC {utc_now.strftime('%H:%M')}（台灣時間 {taiwan_time.strftime('%H:%M')}），在每日報告時間窗口內")
+            print(f"📊 定期執行（每5分鐘），發送日報表")
         
         if should_send:
             if should_send_daily and should_send_alert:
@@ -167,7 +172,7 @@ def main():
             
             print(f"   發送條件:")
             if should_send_daily:
-                print(f"   - 每日報告: 是（UTC 07:00-07:05 或手動觸發，無條件發送）")
+                print(f"   - 日報表: 是（每5分鐘發送一次）")
             if should_send_alert:
                 print(f"   - 波動警報: 是（波動 {volatility_percent:.2f}% >= {VOLATILITY_THRESHOLD}%）")
             else:
@@ -187,6 +192,20 @@ def main():
             
             if success:
                 print("✓ LINE 通知已成功發送")
+                # 記錄本次報告的發送時間（用於追蹤）
+                if should_send_daily:
+                    try:
+                        last_report_file = "last_report_time.json"
+                        report_data = {
+                            'date': utc_now.strftime('%Y-%m-%d'),
+                            'time': utc_now.strftime('%Y-%m-%d %H:%M:%S'),
+                            'taiwan_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        }
+                        with open(last_report_file, 'w', encoding='utf-8') as f:
+                            json.dump(report_data, f, ensure_ascii=False, indent=2)
+                        print(f"✓ 已記錄報告發送時間")
+                    except Exception as e:
+                        print(f"⚠️  記錄報告時間時發生錯誤: {e}")
             else:
                 print("✗ LINE 通知發送失敗")
                 print("   可能的原因:")
@@ -198,7 +217,7 @@ def main():
                 raise Exception("LINE 通知發送失敗，請檢查設定")
         else:
             taiwan_time = datetime.now()
-            print(f"✓ 不在每日報告時間（UTC 07:00，台灣時間 15:00），且價格波動在正常範圍內（{volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%）")
+            print(f"✓ 價格波動在正常範圍內（{volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%），僅發送日報表")
             print(f"   當前 UTC 時間: {utc_now.strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"   當前台灣時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"   是否手動觸發: {is_manual_trigger}")
