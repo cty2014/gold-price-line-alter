@@ -11,19 +11,27 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def get_gold_price():
     """
-    使用 GoldAPI.io 獲取黃金現貨價格（XAU/USD）
+    獲取黃金現貨價格（XAU/USD）
+    優先使用幣安 API，如果失敗則嘗試其他備用 API
     
     Returns:
         dict: 包含 current_price (當前價格) 和 open_price (開盤價) 的字典
               如果獲取失敗則返回 None
     """
+    # 優先使用幣安 API（最穩定可靠，無需 API Key）
+    print("優先使用幣安 API 獲取黃金價格...")
+    binance_result = get_gold_price_binance()
+    if binance_result:
+        return binance_result
+    
+    # 如果幣安 API 失敗，嘗試 GoldAPI.io（需要 API Key）
     try:
         # 從環境變數獲取 API Key
         api_key = os.getenv("GOLDAPI_KEY")
         
         if not api_key or api_key.strip() == "":
             print("⚠️  警告: GOLDAPI_KEY 環境變數未設定")
-            print("   嘗試使用備用 API (鉅亨網)...")
+            print("   幣安 API 失敗，嘗試其他備用 API...")
             return get_gold_price_fallback()
         
         # GoldAPI.io API
@@ -169,19 +177,14 @@ def get_gold_price_binance():
 
 def get_gold_price_fallback():
     """
-    備用 API：嘗試多個免費 API 獲取黃金現貨價格
-    當主要 API 無法使用時的回退方案
+    備用 API：嘗試其他免費 API 獲取黃金現貨價格
+    當幣安 API 和 GoldAPI.io 都無法使用時的回退方案
     
     Returns:
         dict: 包含 current_price (當前價格) 和 open_price (開盤價) 的字典
               如果獲取失敗則返回 None
     """
-    # 優先嘗試幣安 API（最穩定可靠）
-    binance_result = get_gold_price_binance()
-    if binance_result:
-        return binance_result
-    
-    # 嘗試其他備用 API
+    # 嘗試其他備用 API（幣安 API 已在主函數中優先嘗試）
     # 嘗試多個備用 API
     fallback_apis = [
         ("MetalPrice API", "https://api.metals.live/v1/spot/gold"),
