@@ -53,12 +53,15 @@ def format_notification_message(current_price, day_high, day_low, bot_price=None
 
 def main():
     """
-    主程式：每5分鐘發送一次日報表，或當價格波動超過5%時觸發警報通知
+    主程式：每小時監測一次數據
+    - 價格超過5%時寄送通知
+    - 如果沒有超過，每天早上10點和凌晨1:30發送日報表
     """
-    VOLATILITY_THRESHOLD = 5.0  # 5% 的波動閾值（當天最高價與最低價的波動）
+    PRICE_CHANGE_THRESHOLD = 5.0  # 5% 的價格變化閾值
     
     print("黃金價格監控系統啟動...")
-    print(f"波動觸發閾值: {VOLATILITY_THRESHOLD}%")
+    print(f"價格變化觸發閾值: {PRICE_CHANGE_THRESHOLD}%")
+    print("日報表發送時間: 每天早上10:00 和 凌晨01:30 (台灣時間)")
     print("-" * 50)
     
     try:
@@ -139,6 +142,29 @@ def main():
             print(f"⚠️  獲取台灣銀行價格時發生錯誤: {e}")
             bot_price_data = None
         
+        # 讀取上次價格
+        last_price_file = "last_price.json"
+        last_price = None
+        
+        try:
+            if os.path.exists(last_price_file):
+                with open(last_price_file, 'r', encoding='utf-8') as f:
+                    last_data = json.load(f)
+                    last_price = last_data.get('last_price')
+                    if last_price:
+                        print(f"✓ 讀取上次價格: ${last_price:.2f}")
+        except Exception as e:
+            print(f"⚠️  讀取上次價格時發生錯誤: {e}")
+        
+        # 計算價格變化百分比（相對於上次價格）
+        price_change_percent = None
+        if last_price and last_price > 0:
+            price_change_percent = abs((current_price - last_price) / last_price) * 100
+            change_direction = "上漲" if current_price > last_price else "下跌"
+            print(f"  價格變化: {change_direction} {price_change_percent:.2f}% (相對於上次價格 ${last_price:.2f})")
+        else:
+            print("  這是首次執行，無法計算價格變化")
+        
         # 計算當天的價格波動幅度（最高價與最低價的波動）
         if day_high > 0:
             volatility_percent = ((day_high - day_low) / day_high) * 100
@@ -158,66 +184,73 @@ def main():
         print(f"當天最高: ${day_high:.2f} | 當天最低: ${day_low:.2f} | 波動幅度: {volatility_percent:.2f}%")
         
         # 判斷是否應該發送報告
-        # 現在改為每5分鐘發送一次日報表
         utc_now = datetime.utcnow()
         taiwan_time = datetime.now()
+        taiwan_hour = taiwan_time.hour
+        taiwan_minute = taiwan_time.minute
         
         # 輸出當前時間信息（用於調試）
-        print(f"⏰ 當前時間資訊:")
+        print(f"\n⏰ 當前時間資訊:")
         print(f"   UTC 時間: {utc_now.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"   台灣時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"   台灣時間: {taiwan_hour:02d}:{taiwan_minute:02d}")
         
         # 檢查是否為手動觸發（透過環境變數判斷）
-        # GitHub Actions 手動觸發時會設定 GITHUB_EVENT_NAME
         github_event = os.getenv("GITHUB_EVENT_NAME", "")
         is_manual_trigger = github_event == "workflow_dispatch"
         print(f"   GitHub Event: {github_event}")
         print(f"   是否手動觸發: {is_manual_trigger}")
         
-        # 每5分鐘執行一次，每次都發送日報表（無條件發送）
-        # 移除時間窗口限制和重複發送檢查
-        should_send_daily = True
-        print(f"   📊 每5分鐘發送日報表模式：啟用")
+        # 檢查是否為日報表發送時間（早上10:00 或 凌晨01:30）
+        # 允許5分鐘的誤差範圍（考慮 GitHub Actions 的延遲）
+        is_daily_report_time = False
         
-        # 檢查波動是否超過5%（用於警報通知）
+        # 早上10:00 (10:00-10:05)
+        if taiwan_hour == 10 and 0 <= taiwan_minute <= 5:
+            is_daily_report_time = True
+            print(f"   ✓ 檢測到日報表發送時間: 早上10:00")
+        
+        # 凌晨01:30 (01:30-01:35)
+        if taiwan_hour == 1 and 30 <= taiwan_minute <= 35:
+            is_daily_report_time = True
+            print(f"   ✓ 檢測到日報表發送時間: 凌晨01:30")
+        
+        if not is_daily_report_time and not is_manual_trigger:
+            print(f"   ✗ 非日報表發送時間")
+        
+        # 檢查價格變化是否超過5%
         should_send_alert = False
-        if volatility_percent >= VOLATILITY_THRESHOLD:
+        if price_change_percent and price_change_percent >= PRICE_CHANGE_THRESHOLD:
             should_send_alert = True
-            print(f"⚠️  價格波動超過 {VOLATILITY_THRESHOLD}% ({volatility_percent:.2f}%)，觸發警報")
+            print(f"\n⚠️  價格變化超過 {PRICE_CHANGE_THRESHOLD}% ({price_change_percent:.2f}%)，觸發警報通知")
         
         # 決定是否發送通知
-        # 每日報告時間：無條件發送（不論波動是否超過5%）
-        # 其他時間：只有波動超過5%時才發送警報
-        should_send = should_send_daily or should_send_alert
-        
-        if is_manual_trigger:
-            print(f"📊 手動觸發執行，發送報告")
-        elif should_send_daily:
-            print(f"📊 定期執行（每5分鐘），發送日報表")
+        # 1. 價格變化超過5%：立即發送警報
+        # 2. 日報表時間（早上10點或凌晨1:30）：發送日報表
+        # 3. 手動觸發：發送日報表
+        should_send = should_send_alert or is_daily_report_time or is_manual_trigger
         
         if should_send:
-            if should_send_daily and should_send_alert:
-                print(f"📊 準備發送每日黃金價格報告（價格波動超過 {VOLATILITY_THRESHOLD}%）...")
-            elif should_send_daily:
-                if is_manual_trigger:
-                    print(f"📊 準備發送每日黃金價格報告（手動觸發）...")
-                else:
-                    print(f"📊 準備發送每日黃金價格報告...")
-            else:
-                print(f"⚠️  價格波動超過 {VOLATILITY_THRESHOLD}%，發送警報通知...")
-            
-            print(f"   發送條件:")
-            if should_send_daily:
-                print(f"   - 日報表: 是（每5分鐘發送一次）")
             if should_send_alert:
-                print(f"   - 波動警報: 是（波動 {volatility_percent:.2f}% >= {VOLATILITY_THRESHOLD}%）")
-            else:
-                print(f"   - 波動警報: 否（波動 {volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%）")
+                print(f"\n⚠️  準備發送價格變化警報通知...")
+                print(f"   發送原因: 價格變化 {price_change_percent:.2f}% >= {PRICE_CHANGE_THRESHOLD}%")
+            elif is_daily_report_time:
+                print(f"\n📊 準備發送每日黃金價格報告...")
+                print(f"   發送原因: 日報表發送時間（{taiwan_hour:02d}:{taiwan_minute:02d}）")
+            elif is_manual_trigger:
+                print(f"\n📊 準備發送每日黃金價格報告（手動觸發）...")
             
             # 格式化通知訊息
             if should_send_alert:
                 message = format_notification_message(current_price, day_high, day_low, bot_price_data)
-                message = f"⚠️ 價格波動警報\n\n" + message
+                # 添加價格變化信息
+                if price_change_percent:
+                    change_direction = "上漲" if current_price > last_price else "下跌"
+                    message = f"⚠️ 價格變化警報\n\n" + message
+                    message += f"\n\n【價格變化】\n"
+                    message += f"相對於上次價格: {change_direction} {price_change_percent:.2f}%\n"
+                    message += f"上次價格: ${last_price:.2f}\n"
+                    message += f"當前價格: ${current_price:.2f}"
             else:
                 message = format_notification_message(current_price, day_high, day_low, bot_price_data)
             
@@ -230,14 +263,28 @@ def main():
                 
                 if success:
                     print("✓ LINE 通知已成功發送")
+                    
+                    # 保存當前價格到 last_price.json
+                    try:
+                        price_data_to_save = {
+                            'last_price': current_price,
+                            'timestamp': utc_now.strftime('%Y-%m-%d %H:%M:%S'),
+                            'taiwan_time': taiwan_time.strftime('%Y-%m-%d %H:%M:%S')
+                        }
+                        with open(last_price_file, 'w', encoding='utf-8') as f:
+                            json.dump(price_data_to_save, f, ensure_ascii=False, indent=2)
+                        print(f"✓ 已保存當前價格到 {last_price_file}")
+                    except Exception as e:
+                        print(f"⚠️  保存價格時發生錯誤: {e}")
+                    
                     # 記錄本次報告的發送時間（用於追蹤）
-                    if should_send_daily:
+                    if is_daily_report_time or is_manual_trigger:
                         try:
                             last_report_file = "last_report_time.json"
                             report_data = {
                                 'date': utc_now.strftime('%Y-%m-%d'),
                                 'time': utc_now.strftime('%Y-%m-%d %H:%M:%S'),
-                                'taiwan_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                'taiwan_time': taiwan_time.strftime('%Y-%m-%d %H:%M:%S')
                             }
                             with open(last_report_file, 'w', encoding='utf-8') as f:
                                 json.dump(report_data, f, ensure_ascii=False, indent=2)
@@ -260,12 +307,25 @@ def main():
                 traceback.print_exc()
                 print("   警告: 通知發送失敗，但程式繼續執行")
         else:
-            taiwan_time = datetime.now()
-            print(f"✓ 價格波動在正常範圍內（{volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%），僅發送日報表")
-            print(f"   當前 UTC 時間: {utc_now.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"   當前台灣時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"   是否手動觸發: {is_manual_trigger}")
-            print("   不發送通知")
+            # 價格變化未超過5%，且非日報表時間，不發送通知
+            print(f"\n✓ 價格變化在正常範圍內")
+            if price_change_percent:
+                print(f"   價格變化: {price_change_percent:.2f}% < {PRICE_CHANGE_THRESHOLD}%")
+            print(f"   當前時間: {taiwan_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"   非日報表發送時間，不發送通知")
+            
+            # 即使不發送通知，也保存當前價格
+            try:
+                price_data_to_save = {
+                    'last_price': current_price,
+                    'timestamp': utc_now.strftime('%Y-%m-%d %H:%M:%S'),
+                    'taiwan_time': taiwan_time.strftime('%Y-%m-%d %H:%M:%S')
+                }
+                with open(last_price_file, 'w', encoding='utf-8') as f:
+                    json.dump(price_data_to_save, f, ensure_ascii=False, indent=2)
+                print(f"✓ 已保存當前價格到 {last_price_file}")
+            except Exception as e:
+                print(f"⚠️  保存價格時發生錯誤: {e}")
         
         print("-" * 50)
         print("程式執行完成")

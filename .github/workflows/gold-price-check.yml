@@ -2,9 +2,11 @@ name: 黃金價格監控
 
 on:
   schedule:
-    # 每5分鐘執行一次，發送日報表
-    # 注意：GitHub Actions 的 cron 可能會有最多 15 分鐘的延遲
-    - cron: '*/5 * * * *'
+    # 每小時執行一次，監測價格變化
+    # 注意：GitHub Actions 的 cron 使用 UTC 時間
+    # 台灣時間早上10點 = UTC 02:00
+    # 台灣時間凌晨1:30 = UTC 17:30 (前一天)
+    - cron: '0 * * * *'  # 每小時的0分執行
   workflow_dispatch:  # 允許手動觸發
 
 jobs:
