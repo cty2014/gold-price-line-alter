@@ -112,6 +112,61 @@ def get_gold_price():
         return get_gold_price_fallback()
 
 
+def get_gold_price_binance():
+    """
+    使用幣安 API 獲取黃金價格（PAXG/USDT）
+    PAXG (Paxos Gold) 是與黃金掛鉤的穩定幣，1 PAXG = 1 盎司黃金
+    
+    Returns:
+        dict: 包含 current_price (當前價格) 和 open_price (開盤價) 的字典
+              如果獲取失敗則返回 None
+    """
+    try:
+        print("嘗試使用幣安 API (Binance)...")
+        api_url = "https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        # 嘗試正常 SSL 連接
+        try:
+            response = requests.get(api_url, headers=headers, timeout=10, verify=True)
+        except (requests.exceptions.SSLError, ssl.SSLError):
+            # 如果 SSL 錯誤，嘗試使用備用 SSL 設定
+            print("  SSL 錯誤，嘗試使用備用 SSL 設定...")
+            response = requests.get(api_url, headers=headers, timeout=10, verify=False)
+        
+        if response.status_code != 200:
+            print(f"  幣安 API 請求失敗，狀態碼: {response.status_code}")
+            return None
+        
+        data = response.json()
+        
+        # 幣安 API 返回格式: {"symbol":"PAXGUSDT","price":"2345.67"}
+        if 'price' in data:
+            current_price = float(data['price'])
+            
+            if current_price > 0:
+                print(f"✓ 使用幣安 API 獲取數據成功")
+                print(f"  當前價格: ${current_price:.2f}")
+                
+                # 幣安 API 只提供當前價格，使用當前價格作為開盤價、最高價、最低價的近似值
+                return {
+                    'current_price': current_price,
+                    'open_price': current_price,  # 使用當前價格作為開盤價
+                    'day_high': current_price,    # 使用當前價格作為最高價
+                    'day_low': current_price      # 使用當前價格作為最低價
+                }
+        else:
+            print("  幣安 API 回應格式錯誤，缺少 'price' 欄位")
+            return None
+            
+    except Exception as e:
+        print(f"  幣安 API 獲取失敗: {e}")
+        return None
+
+
 def get_gold_price_fallback():
     """
     備用 API：嘗試多個免費 API 獲取黃金現貨價格
@@ -121,6 +176,12 @@ def get_gold_price_fallback():
         dict: 包含 current_price (當前價格) 和 open_price (開盤價) 的字典
               如果獲取失敗則返回 None
     """
+    # 優先嘗試幣安 API（最穩定可靠）
+    binance_result = get_gold_price_binance()
+    if binance_result:
+        return binance_result
+    
+    # 嘗試其他備用 API
     # 嘗試多個備用 API
     fallback_apis = [
         ("MetalPrice API", "https://api.metals.live/v1/spot/gold"),
