@@ -2,17 +2,19 @@ from datetime import datetime
 import os
 import json
 from get_gold_price import get_gold_price
+from get_bot_gold_price import get_bot_gold_price
 from line_notify import send_line_push
 
 
-def format_notification_message(current_price, day_high, day_low):
+def format_notification_message(current_price, day_high, day_low, bot_price=None):
     """
     格式化 LINE 通知訊息（每日黃金價格報告格式）
     
     Args:
-        current_price (float): 當前價格
-        day_high (float): 當天最高價
-        day_low (float): 當天最低價
+        current_price (float): 當前價格（USD/盎司）
+        day_high (float): 當天最高價（USD/盎司）
+        day_low (float): 當天最低價（USD/盎司）
+        bot_price (dict, optional): 台灣銀行價格，格式為 {'price': float, 'unit': str}
     
     Returns:
         str: 格式化後的訊息
@@ -31,11 +33,20 @@ def format_notification_message(current_price, day_high, day_low):
     message = "📊 每日黃金價格報告\n"
     message += f"報告時間: {current_time}\n"
     message += f"日期: {current_date}\n"
+    message += "\n【國際價格（USD/盎司）】\n"
     message += f"當前價格: ${current_price:.2f}\n"
     message += "-------------------\n"
     message += f"當天最高: ${day_high:.2f}\n"
     message += f"當天最低: ${day_low:.2f}\n"
-    message += f"波動幅度: {volatility:.2f}%"
+    message += f"波動幅度: {volatility:.2f}%\n"
+    
+    # 添加台灣銀行價格
+    if bot_price and 'price' in bot_price:
+        message += "\n【台灣銀行黃金牌告匯率】\n"
+        message += f"本行賣出: {bot_price['price']:.2f} {bot_price.get('unit', '台幣/公克')}\n"
+    else:
+        message += "\n【台灣銀行黃金牌告匯率】\n"
+        message += "本行賣出: 無法取得\n"
     
     return message
 
@@ -115,6 +126,19 @@ def main():
         day_high = price_data['day_high']
         day_low = price_data['day_low']
         
+        # 獲取台灣銀行黃金牌告匯率
+        print("\n嘗試獲取台灣銀行黃金牌告匯率...")
+        bot_price_data = None
+        try:
+            bot_price_data = get_bot_gold_price()
+            if bot_price_data:
+                print(f"✓ 成功獲取台灣銀行價格: {bot_price_data['price']:.2f} {bot_price_data.get('unit', '台幣/公克')}")
+            else:
+                print("⚠️  無法獲取台灣銀行價格，將在報告中標註")
+        except Exception as e:
+            print(f"⚠️  獲取台灣銀行價格時發生錯誤: {e}")
+            bot_price_data = None
+        
         # 計算當天的價格波動幅度（最高價與最低價的波動）
         if day_high > 0:
             volatility_percent = ((day_high - day_low) / day_high) * 100
@@ -192,10 +216,10 @@ def main():
             
             # 格式化通知訊息
             if should_send_alert:
-                message = format_notification_message(current_price, day_high, day_low)
+                message = format_notification_message(current_price, day_high, day_low, bot_price_data)
                 message = f"⚠️ 價格波動警報\n\n" + message
             else:
-                message = format_notification_message(current_price, day_high, day_low)
+                message = format_notification_message(current_price, day_high, day_low, bot_price_data)
             
             # 發送 LINE 通知
             print(f"\n準備發送訊息到 LINE...")
