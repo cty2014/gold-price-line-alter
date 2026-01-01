@@ -1,6 +1,12 @@
 import requests
 import os
 from datetime import datetime
+import ssl
+import urllib3
+from urllib3.util.ssl_ import create_urllib3_context
+
+# 禁用 SSL 警告（如果使用 verify=False）
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def get_gold_price():
@@ -127,7 +133,14 @@ def get_gold_price_fallback():
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
-            response = requests.get(api_url, headers=headers, timeout=10)
+            
+            # 嘗試正常 SSL 連接
+            try:
+                response = requests.get(api_url, headers=headers, timeout=10, verify=True)
+            except (requests.exceptions.SSLError, ssl.SSLError) as ssl_error:
+                # 如果 SSL 錯誤，嘗試使用較寬鬆的 SSL 設定（僅作為備用方案）
+                print(f"  SSL 錯誤，嘗試使用備用 SSL 設定...")
+                response = requests.get(api_url, headers=headers, timeout=10, verify=False)
             
             if response.status_code == 200:
                 data = response.json()
@@ -174,7 +187,14 @@ def get_gold_price_fallback():
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
-        response = requests.get(api_url, headers=headers, timeout=10)
+        
+        # 嘗試正常 SSL 連接
+        try:
+            response = requests.get(api_url, headers=headers, timeout=10, verify=True)
+        except requests.exceptions.SSLError:
+            # 如果 SSL 錯誤，嘗試不驗證 SSL 證書
+            print("  SSL 錯誤，嘗試使用備用 SSL 設定...")
+            response = requests.get(api_url, headers=headers, timeout=10, verify=False)
         
         if response.status_code == 200:
             data = response.json()
