@@ -121,32 +121,28 @@ def main():
               f"開盤價格: ${open_price:.2f} | 漲跌幅: {change_percent:+.2f}%")
         print(f"當天最高: ${day_high:.2f} | 當天最低: ${day_low:.2f} | 波動幅度: {volatility_percent:.2f}%")
         
-        # 檢查是否已經發送過今天的報告
-        report_file = "last_report_time.json"
-        should_send_daily = False
-        should_send_alert = False
+        # 判斷是否應該發送每日報告
+        # 在 GitHub Actions 中，我們使用 UTC 時間來判斷
+        # 每日報告時間：UTC 00:00（台灣時間 08:00）
+        utc_now = datetime.utcnow()
+        current_hour = utc_now.hour
+        current_minute = utc_now.minute
         
-        try:
-            if os.path.exists(report_file):
-                with open(report_file, 'r') as f:
-                    last_report = json.load(f)
-                    last_report_date = last_report.get('date', '')
-                    if last_report_date != current_date:
-                        should_send_daily = True
-            else:
-                # 如果檔案不存在，發送每日報告
-                should_send_daily = True
-        except Exception as e:
-            print(f"讀取報告記錄時發生錯誤: {e}")
-            should_send_daily = True
+        # 檢查是否在每日報告時間（UTC 00:00-00:05 之間）
+        # 允許 5 分鐘的執行時間窗口
+        should_send_daily = (current_hour == 0 and current_minute < 5)
         
         # 檢查波動是否超過5%
+        should_send_alert = False
         if volatility_percent >= VOLATILITY_THRESHOLD:
             should_send_alert = True
             print(f"⚠️  價格波動超過 {VOLATILITY_THRESHOLD}% ({volatility_percent:.2f}%)，觸發通知")
         
         # 決定是否發送通知
         should_send = should_send_daily or should_send_alert
+        
+        if should_send_daily:
+            print(f"📊 當前時間 UTC {utc_now.strftime('%H:%M')}，在每日報告時間窗口內")
         
         if should_send:
             if should_send_daily and should_send_alert:
@@ -170,17 +166,6 @@ def main():
             
             if success:
                 print("✓ LINE 通知已成功發送")
-                # 記錄發送時間
-                try:
-                    with open(report_file, 'w') as f:
-                        json.dump({
-                            'date': current_date,
-                            'time': current_time,
-                            'price': current_price,
-                            'volatility': volatility_percent
-                        }, f)
-                except Exception as e:
-                    print(f"記錄報告時間時發生錯誤: {e}")
             else:
                 print("✗ LINE 通知發送失敗")
                 print("   可能的原因:")
@@ -191,7 +176,8 @@ def main():
                 print("   5. Token 已過期或被撤銷")
                 raise Exception("LINE 通知發送失敗，請檢查設定")
         else:
-            print(f"✓ 今日已發送過報告，且價格波動在正常範圍內（{volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%）")
+            print(f"✓ 不在每日報告時間（UTC 00:00），且價格波動在正常範圍內（{volatility_percent:.2f}% < {VOLATILITY_THRESHOLD}%）")
+            print(f"   當前 UTC 時間: {utc_now.strftime('%Y-%m-%d %H:%M:%S')}")
             print("   不發送通知")
         
         print("-" * 50)
