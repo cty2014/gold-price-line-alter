@@ -30,12 +30,41 @@ def send_line_push(message):
             print("   請在 GitHub Secrets 中設定 USER_ID")
             return False
         
-        # 初始化 LineBotApi
-        line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
+        # 清理和驗證 Token（移除空格、換行符等）
+        token_cleaned = CHANNEL_ACCESS_TOKEN.strip()
+        # 移除所有空白字符（空格、換行、製表符等）
+        token_cleaned = ''.join(token_cleaned.split())
+        
+        # 驗證 Token 格式（LINE Token 通常是 base64 編碼的字符串）
+        if not token_cleaned or len(token_cleaned) < 50:
+            print(f"✗ 錯誤: CHANNEL_ACCESS_TOKEN 格式異常（長度: {len(token_cleaned)}）")
+            print("   LINE Channel Access Token 通常長度應該超過 50 字元")
+            print("   請檢查 GitHub Secrets 中的 CHANNEL_ACCESS_TOKEN 是否正確")
+            return False
+        
+        # 檢查 Token 是否包含無效字符
+        import re
+        if not re.match(r'^[A-Za-z0-9+/=]+$', token_cleaned):
+            print(f"✗ 錯誤: CHANNEL_ACCESS_TOKEN 包含無效字符")
+            print("   Token 應該只包含字母、數字和 +/= 字符")
+            print("   請檢查 GitHub Secrets 中的 CHANNEL_ACCESS_TOKEN 是否正確")
+            return False
+        
+        # 初始化 LineBotApi（使用清理後的 Token）
+        line_bot_api = LineBotApi(token_cleaned)
+        
+        # 清理和驗證 USER_ID
+        user_id_str = str(USER_ID).strip()
+        # 移除所有空白字符
+        user_id_str = ''.join(user_id_str.split())
+        
+        if not user_id_str or len(user_id_str) < 10:
+            print(f"✗ 錯誤: USER_ID 格式異常（長度: {len(user_id_str)}）")
+            print("   LINE User ID 通常長度應該超過 10 字元")
+            print("   請檢查 GitHub Secrets 中的 USER_ID 是否正確")
+            return False
         
         # 發送文字訊息
-        # 確保 USER_ID 是字符串格式
-        user_id_str = str(USER_ID).strip()
         line_bot_api.push_message(user_id_str, TextSendMessage(text=message))
         
         print(f"✓ 訊息已成功發送")
@@ -52,7 +81,18 @@ def send_line_push(message):
         print(f"錯誤訊息: {error_msg}")
         
         # 詳細錯誤診斷
-        if "401" in error_msg or "Authentication failed" in error_msg or "invalid_token" in error_msg:
+        if "Invalid header value" in error_msg or "invalid header" in error_msg.lower():
+            print(f"\n診斷: CHANNEL_ACCESS_TOKEN 格式錯誤（包含無效字符）")
+            print(f"Token 長度: {len(CHANNEL_ACCESS_TOKEN) if CHANNEL_ACCESS_TOKEN else 0} 字元")
+            print(f"Token 前10字元: {CHANNEL_ACCESS_TOKEN[:10] if CHANNEL_ACCESS_TOKEN else 'N/A'}...")
+            print(f"解決方法:")
+            print(f"  1. 前往 GitHub Secrets 頁面")
+            print(f"  2. 檢查 CHANNEL_ACCESS_TOKEN 的值")
+            print(f"  3. 確認 Token 沒有多餘的空格、換行符或特殊字符")
+            print(f"  4. 如果 Token 有問題，前往 LINE Developers Console 重新生成")
+            print(f"  5. 複製 Token 時，確保只複製 Token 本身，不要包含其他字符")
+            print(f"  6. 更新 GitHub Secrets 中的 CHANNEL_ACCESS_TOKEN")
+        elif "401" in error_msg or "Authentication failed" in error_msg or "invalid_token" in error_msg:
             print(f"\n診斷: CHANNEL_ACCESS_TOKEN 無效或已過期")
             print(f"解決方法:")
             print(f"  1. 前往 LINE Developers Console: https://developers.line.biz/console/")
