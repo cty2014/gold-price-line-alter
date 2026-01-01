@@ -57,9 +57,31 @@ jobs:
         
         # 檢查 GOLDAPI_KEY（選填）
         if [ -z "$GOLDAPI_KEY" ]; then
-          echo "⚠️  警告: GOLDAPI_KEY 未設定，將使用備用 API"
+          echo "⚠️  警告: GOLDAPI_KEY 未設定，將使用備用 API（幣安 API）"
+          echo "   提示: 如需使用 GoldAPI.io，請在 GitHub Secrets 中設定 GOLDAPI_KEY"
         else
           echo "✓ GOLDAPI_KEY: 已設定 (長度: ${#GOLDAPI_KEY} 字元)"
+          echo "   將在幣安 API 失敗時使用 GoldAPI.io"
+          
+          # 測試 API Key 是否有效（可選）
+          echo "   測試 GoldAPI.io API Key..."
+          TEST_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "https://www.goldapi.io/api/XAU/USD" \
+            -H "x-access-token: $GOLDAPI_KEY" \
+            -H "Content-Type: application/json" \
+            --max-time 10)
+          
+          HTTP_CODE=$(echo "$TEST_RESPONSE" | tail -n1)
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "   ✓ GoldAPI.io API Key 有效"
+          elif [ "$HTTP_CODE" = "401" ]; then
+            echo "   ✗ GoldAPI.io API Key 無效或未授權（狀態碼: 401）"
+            echo "     請檢查 API Key 是否正確或已過期"
+          elif [ "$HTTP_CODE" = "429" ]; then
+            echo "   ⚠️  GoldAPI.io API 請求頻率過高（狀態碼: 429）"
+          else
+            echo "   ⚠️  GoldAPI.io API 測試失敗（狀態碼: $HTTP_CODE）"
+            echo "     將使用備用 API"
+          fi
         fi
         
         echo ""
