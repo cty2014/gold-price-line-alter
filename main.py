@@ -66,14 +66,16 @@ def format_notification_message(current_price, day_high, day_low, bot_price=None
 def main():
     """
     主程式：每小時監測一次數據
+    - 每小時檢查一次黃金價格
     - 價格超過5%時寄送通知
-    - 如果沒有超過，每天早上10:00-10:05和凌晨01:45-01:50發送日報表
+    - 固定在中午12:00檢查完價格後發出報表
     """
     PRICE_CHANGE_THRESHOLD = 5.0  # 5% 的價格變化閾值
     
     print("黃金價格監控系統啟動...")
     print(f"價格變化觸發閾值: {PRICE_CHANGE_THRESHOLD}%")
-    print("日報表發送時間: 每天早上10:00-10:05 和 凌晨01:45-01:50 (台灣時間)")
+    print("執行頻率: 每小時檢查一次價格")
+    print("日報表發送時間: 中午12:00-12:05 (台灣時間)")
     print("-" * 50)
     
     try:
@@ -213,19 +215,14 @@ def main():
         print(f"   GitHub Event: {github_event}")
         print(f"   是否手動觸發: {is_manual_trigger}")
         
-        # 檢查是否為日報表發送時間（早上10:00 或 凌晨01:45）
+        # 檢查是否為日報表發送時間（中午12:00）
         # 允許5分鐘的誤差範圍（考慮 GitHub Actions 的延遲）
         is_daily_report_time = False
         
-        # 早上10:00 (10:00-10:05)
-        if taiwan_hour == 10 and 0 <= taiwan_minute <= 5:
+        # 中午12:00 (12:00-12:05)
+        if taiwan_hour == 12 and 0 <= taiwan_minute <= 5:
             is_daily_report_time = True
-            print(f"   ✓ 檢測到日報表發送時間: 早上10:00")
-        
-        # 凌晨01:45 (01:45-01:50)
-        if taiwan_hour == 1 and 45 <= taiwan_minute <= 50:
-            is_daily_report_time = True
-            print(f"   ✓ 檢測到日報表發送時間: 凌晨01:45")
+            print(f"   ✓ 檢測到日報表發送時間: 中午12:00")
         
         if not is_daily_report_time and not is_manual_trigger:
             print(f"   ✗ 非日報表發送時間")
