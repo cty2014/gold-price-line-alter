@@ -185,21 +185,52 @@ def main():
             if os.path.exists(daily_price_file):
                 with open(daily_price_file, 'r', encoding='utf-8') as f:
                     daily_data = json.load(f)
+                    stored_date = daily_data.get('date')
                     # 檢查是否為同一天
-                    if daily_data.get('date') == current_date:
+                    if stored_date == current_date:
                         tracked_day_high = daily_data.get('day_high')
                         tracked_day_low = daily_data.get('day_low')
                         print(f"✓ 讀取當日價格記錄: 最高 ${tracked_day_high:.2f}, 最低 ${tracked_day_low:.2f}")
+                        if tracked_day_high == tracked_day_low:
+                            print(f"  ⚠️  注意：最高和最低價相同（可能是首次執行或價格未變化）")
                     else:
-                        print(f"  新的一天，重置當日價格記錄")
+                        print(f"  新的一天（儲存日期: {stored_date}, 當前日期: {current_date}），重置當日價格記錄")
+            else:
+                print(f"  daily_price.json 不存在，將創建新記錄")
         except Exception as e:
             print(f"⚠️  讀取當日價格記錄時發生錯誤: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # 記錄更新前的值
+        old_high = tracked_day_high
+        old_low = tracked_day_low
         
         # 更新當日最高和最低價
-        if tracked_day_high is None or current_price > tracked_day_high:
+        high_updated = False
+        low_updated = False
+        
+        if tracked_day_high is None:
             tracked_day_high = current_price
-        if tracked_day_low is None or current_price < tracked_day_low:
+            high_updated = True
+            print(f"  ✓ 初始化最高價: ${tracked_day_high:.2f}")
+        elif current_price > tracked_day_high:
+            tracked_day_high = current_price
+            high_updated = True
+            print(f"  ✓ 更新最高價: ${old_high:.2f} → ${tracked_day_high:.2f}")
+        
+        if tracked_day_low is None:
             tracked_day_low = current_price
+            low_updated = True
+            print(f"  ✓ 初始化最低價: ${tracked_day_low:.2f}")
+        elif current_price < tracked_day_low:
+            tracked_day_low = current_price
+            low_updated = True
+            print(f"  ✓ 更新最低價: ${old_low:.2f} → ${tracked_day_low:.2f}")
+        
+        # 如果都沒有更新，說明價格在範圍內
+        if not high_updated and not low_updated and tracked_day_high is not None:
+            print(f"  ℹ️  當前價格 ${current_price:.2f} 在範圍內（最高: ${tracked_day_high:.2f}, 最低: ${tracked_day_low:.2f}）")
         
         # 保存當日價格記錄
         try:
