@@ -65,17 +65,18 @@ def format_notification_message(current_price, day_high, day_low, bot_price=None
 
 def main():
     """
-    主程式：每小時監測一次數據
-    - 每小時檢查一次黃金價格
-    - 價格超過5%時寄送通知
-    - 固定在中午12:00檢查完價格後發出報表
+    主程式：每10分鐘檢查一次黃金價格
+    - 每隔10分鐘檢查一次黃金價格
+    - 追蹤當日最低與最高價
+    - 價格變化超過5%時立即發送警報（相對於上次價格）
+    - 固定在整點發送日報表（允許5分鐘誤差）
     """
     PRICE_CHANGE_THRESHOLD = 5.0  # 5% 的價格變化閾值
     
     print("黃金價格監控系統啟動...")
     print(f"價格變化觸發閾值: {PRICE_CHANGE_THRESHOLD}%")
-    print("執行頻率: 每小時檢查一次價格")
-    print("日報表發送時間: 中午12:00-12:05 (台灣時間)")
+    print("執行頻率: 每10分鐘檢查一次價格")
+    print("日報表發送時間: 整點 (允許5分鐘誤差，台灣時間)")
     print("-" * 50)
     
     try:
@@ -157,11 +158,19 @@ def main():
             print(f"⚠️  獲取台灣銀行價格時發生錯誤: {e}")
             bot_price_data = None
         
-        # 讀取上次價格
+        # 獲取台灣時間（用於日期判斷和時間顯示）
+        taiwan_time = get_taiwan_time()
+        current_date = taiwan_time.strftime('%Y-%m-%d')
+        
+        # 讀取上次價格和當日價格記錄
         last_price_file = "last_price.json"
+        daily_price_file = "daily_price.json"
         last_price = None
+        tracked_day_high = None
+        tracked_day_low = None
         
         try:
+            # 讀取上次價格
             if os.path.exists(last_price_file):
                 with open(last_price_file, 'r', encoding='utf-8') as f:
                     last_data = json.load(f)
@@ -170,6 +179,41 @@ def main():
                         print(f"✓ 讀取上次價格: ${last_price:.2f}")
         except Exception as e:
             print(f"⚠️  讀取上次價格時發生錯誤: {e}")
+        
+        # 讀取或初始化當日價格記錄
+        try:
+            if os.path.exists(daily_price_file):
+                with open(daily_price_file, 'r', encoding='utf-8') as f:
+                    daily_data = json.load(f)
+                    # 檢查是否為同一天
+                    if daily_data.get('date') == current_date:
+                        tracked_day_high = daily_data.get('day_high')
+                        tracked_day_low = daily_data.get('day_low')
+                        print(f"✓ 讀取當日價格記錄: 最高 ${tracked_day_high:.2f}, 最低 ${tracked_day_low:.2f}")
+                    else:
+                        print(f"  新的一天，重置當日價格記錄")
+        except Exception as e:
+            print(f"⚠️  讀取當日價格記錄時發生錯誤: {e}")
+        
+        # 更新當日最高和最低價
+        if tracked_day_high is None or current_price > tracked_day_high:
+            tracked_day_high = current_price
+        if tracked_day_low is None or current_price < tracked_day_low:
+            tracked_day_low = current_price
+        
+        # 保存當日價格記錄
+        try:
+            daily_data_to_save = {
+                'date': current_date,
+                'day_high': tracked_day_high,
+                'day_low': tracked_day_low,
+                'last_update': taiwan_time.strftime('%Y-%m-%d %H:%M:%S')
+            }
+            with open(daily_price_file, 'w', encoding='utf-8') as f:
+                json.dump(daily_data_to_save, f, ensure_ascii=False, indent=2)
+            print(f"✓ 已更新當日價格記錄: 最高 ${tracked_day_high:.2f}, 最低 ${tracked_day_low:.2f}")
+        except Exception as e:
+            print(f"⚠️  保存當日價格記錄時發生錯誤: {e}")
         
         # 計算價格變化百分比（相對於上次價格）
         price_change_percent = None
@@ -180,9 +224,9 @@ def main():
         else:
             print("  這是首次執行，無法計算價格變化")
         
-        # 計算當天的價格波動幅度（最高價與最低價的波動）
-        if day_high > 0:
-            volatility_percent = ((day_high - day_low) / day_high) * 100
+        # 計算當天的價格波動幅度（使用追蹤的當日最高和最低價）
+        if tracked_day_high and tracked_day_high > 0:
+            volatility_percent = ((tracked_day_high - tracked_day_low) / tracked_day_high) * 100
         else:
             volatility_percent = 0.0
         
@@ -190,15 +234,13 @@ def main():
         change_percent = ((current_price - open_price) / open_price) * 100
         
         # 顯示當前狀態（使用台灣時間）
-        taiwan_time = get_taiwan_time()
-        current_date = taiwan_time.strftime('%Y-%m-%d')
         current_time = taiwan_time.strftime('%Y-%m-%d %H:%M:%S')
         taiwan_hour = taiwan_time.hour
         taiwan_minute = taiwan_time.minute
         
         print(f"[{current_time}] 當前價格: ${current_price:.2f} | "
               f"開盤價格: ${open_price:.2f} | 漲跌幅: {change_percent:+.2f}%")
-        print(f"當天最高: ${day_high:.2f} | 當天最低: ${day_low:.2f} | 波動幅度: {volatility_percent:.2f}%")
+        print(f"當日追蹤: 最高 ${tracked_day_high:.2f} | 最低 ${tracked_day_low:.2f} | 波動幅度: {volatility_percent:.2f}%")
         
         # 判斷是否應該發送報告
         utc_now = datetime.utcnow()
@@ -215,17 +257,17 @@ def main():
         print(f"   GitHub Event: {github_event}")
         print(f"   是否手動觸發: {is_manual_trigger}")
         
-        # 檢查是否為日報表發送時間（中午12:00）
+        # 檢查是否為日報表發送時間（整點，允許5分鐘誤差）
         # 允許5分鐘的誤差範圍（考慮 GitHub Actions 的延遲）
         is_daily_report_time = False
         
-        # 中午12:00 (12:00-12:05)
-        if taiwan_hour == 12 and 0 <= taiwan_minute <= 5:
+        # 整點檢查（00:00-00:05, 01:00-01:05, ..., 23:00-23:05）
+        if 0 <= taiwan_minute <= 5:
             is_daily_report_time = True
-            print(f"   ✓ 檢測到日報表發送時間: 中午12:00")
+            print(f"   ✓ 檢測到日報表發送時間: {taiwan_hour:02d}:00 (整點)")
         
         if not is_daily_report_time and not is_manual_trigger:
-            print(f"   ✗ 非日報表發送時間")
+            print(f"   ✗ 非日報表發送時間（當前時間: {taiwan_hour:02d}:{taiwan_minute:02d}）")
         
         # 檢查價格變化是否超過5%
         should_send_alert = False
@@ -235,7 +277,7 @@ def main():
         
         # 決定是否發送通知
         # 1. 價格變化超過5%：立即發送警報
-        # 2. 日報表時間（早上10點或凌晨1:30）：發送日報表
+        # 2. 日報表時間（整點）：發送日報表
         # 3. 手動觸發：發送日報表
         should_send = should_send_alert or is_daily_report_time or is_manual_trigger
         
@@ -249,9 +291,9 @@ def main():
             elif is_manual_trigger:
                 print(f"\n📊 準備發送每日黃金價格報告（手動觸發）...")
             
-            # 格式化通知訊息
+            # 格式化通知訊息（使用追蹤的當日最高和最低價）
             if should_send_alert:
-                message = format_notification_message(current_price, day_high, day_low, bot_price_data)
+                message = format_notification_message(current_price, tracked_day_high, tracked_day_low, bot_price_data)
                 # 添加價格變化信息
                 if price_change_percent:
                     change_direction = "上漲" if current_price > last_price else "下跌"
@@ -261,7 +303,7 @@ def main():
                     message += f"上次價格: ${last_price:.2f}\n"
                     message += f"當前價格: ${current_price:.2f}"
             else:
-                message = format_notification_message(current_price, day_high, day_low, bot_price_data)
+                message = format_notification_message(current_price, tracked_day_high, tracked_day_low, bot_price_data)
             
             # 發送 LINE 通知
             print(f"\n準備發送訊息到 LINE...")
