@@ -76,7 +76,7 @@ def main():
     print("黃金價格監控系統啟動...")
     print(f"價格變化觸發閾值: {PRICE_CHANGE_THRESHOLD}%")
     print("執行頻率: 每10分鐘檢查一次價格")
-    print("日報表發送時間: 整點 (0-15分鐘，台灣時間)")
+    print("日報表發送時間: 整點（不同小時或0-20分鐘，台灣時間）")
     print("-" * 50)
     
     try:
@@ -280,33 +280,44 @@ def main():
             last_report_time = None
         
         # 檢查是否應該發送日報表
-        # 條件1: 當前時間在整點時段（0-15分鐘，擴大範圍以涵蓋更多執行時間點）
-        # 條件2: 距離上次發送超過50分鐘（降低要求，確保每個整點都能發送）
-        # 或者：上次發送的小時數與當前小時數不同（確保每個整點都發送）
-        if 0 <= taiwan_minute <= 15:
+        # 簡化邏輯：只要當前小時與上次發送的小時不同，就發送
+        # 這樣可以確保每個整點都能發送，不受時間範圍限制
+        # 同時檢查時間範圍（0-20分鐘）作為額外保障
+        should_send_by_hour = False
+        should_send_by_range = False
+        
+        # 檢查是否為不同的小時
+        if last_report_time is not None:
+            last_hour = last_report_time.hour
+            should_send_by_hour = taiwan_hour != last_hour
+        
+        # 檢查是否在時間範圍內
+        should_send_by_range = 0 <= taiwan_minute <= 20
+        
+        # 如果滿足任一條件，就發送
+        if should_send_by_hour or should_send_by_range or last_report_time is None:
+            is_daily_report_time = True
+            
             if last_report_time is None:
                 # 沒有上次發送記錄，發送
-                is_daily_report_time = True
                 print(f"   ✓ 檢測到日報表發送時間: {taiwan_hour:02d}:{taiwan_minute:02d} (首次發送)")
             else:
                 # 計算時間差
                 time_diff = taiwan_time - last_report_time
                 minutes_diff = time_diff.total_seconds() / 60
-                
-                # 檢查是否為不同的小時（確保每個整點都發送）
                 last_hour = last_report_time.hour
-                is_different_hour = taiwan_hour != last_hour
                 
-                if minutes_diff >= 50 or is_different_hour:
-                    # 距離上次發送超過50分鐘，或不同小時，發送
-                    is_daily_report_time = True
-                    print(f"   ✓ 檢測到日報表發送時間: {taiwan_hour:02d}:{taiwan_minute:02d}")
-                    if is_different_hour:
-                        print(f"   不同小時（上次: {last_hour:02d}時，當前: {taiwan_hour:02d}時）")
-                    else:
-                        print(f"   距離上次發送: {int(minutes_diff)} 分鐘")
-                else:
-                    print(f"   ⏸ 距離上次發送僅 {int(minutes_diff)} 分鐘，跳過發送（避免重複）")
+                # 記錄發送原因
+                reasons = []
+                if should_send_by_hour:
+                    reasons.append(f"不同小時（上次: {last_hour:02d}時，當前: {taiwan_hour:02d}時）")
+                if should_send_by_range:
+                    reasons.append(f"在時間範圍內（{taiwan_minute}分鐘）")
+                if minutes_diff >= 50:
+                    reasons.append(f"距離上次發送 {int(minutes_diff)} 分鐘")
+                
+                print(f"   ✓ 檢測到日報表發送時間: {taiwan_hour:02d}:{taiwan_minute:02d}")
+                print(f"   發送原因: {', '.join(reasons) if reasons else '首次發送'}")
         
         if not is_daily_report_time and not is_manual_trigger:
             print(f"   ✗ 非日報表發送時間（當前時間: {taiwan_hour:02d}:{taiwan_minute:02d}）")
