@@ -76,7 +76,7 @@ def main():
     print("黃金價格監控系統啟動...")
     print(f"價格變化觸發閾值: {PRICE_CHANGE_THRESHOLD}%")
     print("執行頻率: 每10分鐘檢查一次價格")
-    print("日報表發送時間: 整點 (允許5分鐘誤差，台灣時間)")
+    print("日報表發送時間: 整點 (0-10分鐘，台灣時間)")
     print("-" * 50)
     
     try:
@@ -142,8 +142,8 @@ def main():
         
         current_price = price_data['current_price']
         open_price = price_data['open_price']
-        day_high = price_data['day_high']
-        day_low = price_data['day_low']
+        # 注意：API 返回的 day_high 和 day_low 都是當前價格（API 只提供當前價格）
+        # 實際的最高/最低價由 tracked_day_high 和 tracked_day_low 追蹤
         
         # 獲取台灣銀行黃金牌告匯率
         print("\n嘗試獲取台灣銀行黃金牌告匯率...")
@@ -257,14 +257,48 @@ def main():
         print(f"   GitHub Event: {github_event}")
         print(f"   是否手動觸發: {is_manual_trigger}")
         
-        # 檢查是否為日報表發送時間（整點，允許5分鐘誤差）
-        # 允許5分鐘的誤差範圍（考慮 GitHub Actions 的延遲）
+        # 檢查是否為日報表發送時間
+        # 使用時間間隔檢查：如果距離上次發送超過55分鐘，且當前時間在整點時段（0-10分鐘），就發送
+        # 這樣可以確保每小時發送一次，同時涵蓋 GitHub Actions 的執行時間點
         is_daily_report_time = False
         
-        # 整點檢查（00:00-00:05, 01:00-01:05, ..., 23:00-23:05）
-        if 0 <= taiwan_minute <= 5:
-            is_daily_report_time = True
-            print(f"   ✓ 檢測到日報表發送時間: {taiwan_hour:02d}:00 (整點)")
+        # 讀取上次報告發送時間
+        last_report_file = "last_report_time.json"
+        last_report_time = None
+        try:
+            if os.path.exists(last_report_file):
+                with open(last_report_file, 'r', encoding='utf-8') as f:
+                    report_data = json.load(f)
+                    last_report_str = report_data.get('taiwan_time', '')
+                    if last_report_str:
+                        # 解析上次發送時間
+                        last_report_time = datetime.strptime(last_report_str, '%Y-%m-%d %H:%M:%S')
+                        # 轉換為台灣時區
+                        last_report_time = last_report_time.replace(tzinfo=timezone(timedelta(hours=8)))
+        except Exception as e:
+            print(f"⚠️  讀取上次報告時間時發生錯誤: {e}")
+            last_report_time = None
+        
+        # 檢查是否應該發送日報表
+        # 條件1: 當前時間在整點時段（0-10分鐘）
+        # 條件2: 距離上次發送超過55分鐘（確保每小時只發送一次）
+        if 0 <= taiwan_minute <= 10:
+            if last_report_time is None:
+                # 沒有上次發送記錄，發送
+                is_daily_report_time = True
+                print(f"   ✓ 檢測到日報表發送時間: {taiwan_hour:02d}:{taiwan_minute:02d} (首次發送)")
+            else:
+                # 計算時間差
+                time_diff = taiwan_time - last_report_time
+                minutes_diff = time_diff.total_seconds() / 60
+                
+                if minutes_diff >= 55:
+                    # 距離上次發送超過55分鐘，發送
+                    is_daily_report_time = True
+                    print(f"   ✓ 檢測到日報表發送時間: {taiwan_hour:02d}:{taiwan_minute:02d}")
+                    print(f"   距離上次發送: {int(minutes_diff)} 分鐘")
+                else:
+                    print(f"   ⏸ 距離上次發送僅 {int(minutes_diff)} 分鐘，跳過發送（避免重複）")
         
         if not is_daily_report_time and not is_manual_trigger:
             print(f"   ✗ 非日報表發送時間（當前時間: {taiwan_hour:02d}:{taiwan_minute:02d}）")
